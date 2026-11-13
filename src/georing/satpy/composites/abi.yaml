@@ -1,0 +1,28 @@
+sensor_name: visir/abi
+
+composites:
+  georing_day:
+    compositor: !!python/name:satpy.composites.resolution.SelfSharpenedRGB
+    standard_name: georing_day
+    prerequisites:
+      - name: C02
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: georing_green
+      - name: C01
+        modifiers: [georing_sunz, georing_rayleigh]
+
+  # ABI has no green band. CIRA synthesises AHI's 0.51 um green and then adds
+  # a little near infrared (Miller et al. 2020, sect. 5a1); 0.51 um lies
+  # nearer blue than red, so blue weighs more than in satpy's even split
+  # (0.465, 0.465, 0.07). It turns shallow water on sand turquoise.
+  georing_green:
+    compositor: !!python/name:satpy.composites.abi.SimulatedGreen
+    fractions: [0.565, 0.365, 0.07]
+    standard_name: toa_bidirectional_reflectance
+    prerequisites:
+      - name: C01
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: C02
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: C03
+        modifiers: [georing_sunz]

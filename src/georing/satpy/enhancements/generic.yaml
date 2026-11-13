@@ -1,0 +1,82 @@
+# How the Recipe's layers become colour. Levels are on a 0 to 255 scale.
+enhancements:
+  # The day layer: satpy's stretch for true colour, then a tone curve per
+  # channel and sensor. The curves were fitted once: for each level of ours
+  # rendered without them, the median level CIRA's GeoColor shows at the same
+  # pixels of the high-sun tuning scenes. From level 140 up the three sensors
+  # share one curve, read off all of them; below, each differs with its bands
+  # and how the green is made. The tool that fitted them was not kept.
+  georing_day_abi:
+    standard_name: georing_day
+    sensor: abi
+    operations:
+      - name: cira_stretch
+        method: !!python/name:satpy.enhancements.contrast.cira_stretch
+      - name: tone curves
+        method: !!python/name:georing.recipe.channel_curves
+        kwargs:
+          xp: &levels [0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 140, 160, 180, 200, 220, 235, 255]
+          red: [0, 0, 0, 2, 11, 22, 29, 42, 54, 65, 88, 110, 132, 153, 175, 197, 218, 239, 246, 255]
+          green: [0, 0, 0, 13, 20, 29, 37, 49, 60, 71, 92, 115, 136, 154, 177, 197, 218, 238, 245, 255]
+          blue: [4, 8, 12, 16, 23, 28, 34, 49, 63, 75, 97, 119, 140, 159, 179, 198, 218, 237, 245, 255]
+
+  georing_day_ahi:
+    standard_name: georing_day
+    sensor: ahi
+    operations:
+      - name: cira_stretch
+        method: !!python/name:satpy.enhancements.contrast.cira_stretch
+      - name: tone curves
+        method: !!python/name:georing.recipe.channel_curves
+        kwargs:
+          xp: *levels
+          red: [0, 0, 0, 4, 11, 18, 24, 37, 50, 62, 85, 108, 131, 153, 175, 197, 218, 239, 246, 255]
+          green: [0, 0, 3, 9, 15, 21, 27, 38, 51, 63, 85, 109, 133, 154, 177, 197, 218, 238, 245, 255]
+          blue: [0, 0, 0, 8, 17, 25, 32, 43, 55, 66, 89, 112, 136, 159, 179, 198, 218, 237, 245, 255]
+
+  georing_day_fci:
+    standard_name: georing_day
+    sensor: fci
+    operations:
+      - name: cira_stretch
+        method: !!python/name:satpy.enhancements.contrast.cira_stretch
+      - name: tone curves
+        method: !!python/name:georing.recipe.channel_curves
+        kwargs:
+          xp: *levels
+          red: [0, 0, 0, 7, 13, 20, 26, 39, 51, 63, 86, 109, 131, 153, 175, 197, 218, 239, 246, 255]
+          green: [0, 6, 11, 16, 22, 28, 34, 46, 58, 69, 91, 112, 132, 154, 177, 197, 218, 238, 245, 255]
+          blue: [29, 34, 39, 43, 47, 52, 56, 64, 73, 83, 102, 115, 139, 159, 179, 198, 218, 237, 245, 255]
+
+  # The city lights: NASA's Black Marble, recoloured by its own brightness.
+  # Sea stays black, unlit land turns dark purple and the lights turn amber,
+  # deepening from the dim fringes to the bright cores. Read off the clear
+  # land of the night and night-warm tuning scenes: for each brightness, the
+  # median colour CIRA shows there once its infrared layer is taken off.
+  georing_city_lights:
+    standard_name: georing_city_lights
+    operations:
+      - name: stretch
+        method: !!python/name:satpy.enhancements.contrast.stretch
+        kwargs: {stretch: crude, min_stretch: [0, 0, 0], max_stretch: [255, 255, 255]}
+      - name: colour by brightness
+        method: !!python/name:georing.recipe.colour_by_brightness
+        kwargs:
+          xp: [0, 10, 16, 45, 70, 92, 122, 165, 200, 255]
+          red: [0, 10, 26, 26, 76, 90, 106, 129, 153, 181]
+          green: [0, 10, 20, 19, 38, 50, 63, 84, 111, 145]
+          blue: [0, 12, 43, 43, 40, 39, 41, 49, 70, 105]
+
+  georing_high_clouds:
+    standard_name: georing_high_clouds
+    operations:
+      - name: white
+        method: !!python/name:georing.recipe.uniform_luminance
+        kwargs: {level: 255}
+
+  georing:
+    standard_name: georing
+    operations:
+      - name: stretch
+        method: !!python/name:satpy.enhancements.contrast.stretch
+        kwargs: {stretch: crude, min_stretch: [0, 0, 0], max_stretch: [1, 1, 1]}

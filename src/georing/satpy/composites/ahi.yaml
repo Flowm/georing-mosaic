@@ -1,0 +1,22 @@
+sensor_name: visir/ahi
+
+composites:
+  georing_day:
+    compositor: !!python/name:satpy.composites.resolution.SelfSharpenedRGB
+    standard_name: georing_day
+    prerequisites:
+      - name: B03
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: georing_green
+      - name: B01
+        modifiers: [georing_sunz, georing_rayleigh]
+
+  # The 0.51 um band misses chlorophyll; the near infrared puts the green back.
+  georing_green:
+    compositor: !!python/name:satpy.composites.spectral.HybridGreen
+    standard_name: toa_bidirectional_reflectance
+    prerequisites:
+      - name: B02
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: B04
+        modifiers: [georing_sunz]

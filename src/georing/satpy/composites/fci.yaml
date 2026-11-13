@@ -1,0 +1,27 @@
+sensor_name: visir/fci
+
+composites:
+  georing_day:
+    compositor: !!python/name:satpy.composites.resolution.SelfSharpenedRGB
+    standard_name: georing_day
+    prerequisites:
+      - name: vis_06
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: georing_green
+      - name: vis_04
+        modifiers: [georing_sunz, georing_rayleigh]
+
+  # The 0.51 um band misses chlorophyll; the near infrared puts the green
+  # back, more of it where there is vegetation. Limits and strength are satpy's.
+  georing_green:
+    compositor: !!python/name:satpy.composites.spectral.NDVIHybridGreen
+    limits: [0.15, 0.05]
+    strength: 3.0
+    standard_name: toa_bidirectional_reflectance
+    prerequisites:
+      - name: vis_05
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: vis_06
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: vis_08
+        modifiers: [georing_sunz]

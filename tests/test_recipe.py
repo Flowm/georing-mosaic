@@ -1,0 +1,69 @@
+import dask.array as da
+import numpy as np
+import xarray as xr
+from trollimage.xrimage import XRImage
+
+from georing.recipe import (
+    channel_curves,
+    colour_by_brightness,
+    uniform_luminance,
+)
+
+
+def image(pixels: list[list[float]], bands: str = "RGB") -> XRImage:
+    """Build an image of one row whose pixels are given as channel tuples on 0 to 255."""
+    data = np.array(pixels, dtype=np.float32).T[:, None, :] / 255
+    return XRImage(xr.DataArray(da.from_array(data, chunks=(1, 1, 2)), dims=("bands", "y", "x"),
+                                coords={"bands": list(bands)}))
+
+
+def levels(data: xr.DataArray) -> list[list[int]]:
+    return np.rint(data.values[:, 0, :].T * 255).astype(int).tolist()
+
+
+def test_each_channel_follows_its_own_curve():
+    out = channel_curves(image([[100, 100, 100], [50, 50, 50]]), xp=[0, 100, 255],
+                         red=[0, 110, 255], green=[0, 120, 255], blue=[0, 130, 255])
+    assert levels(out) == [[110, 120, 130], [55, 60, 65]]
+
+
+def test_curves_leave_alpha_and_missing_pixels_alone():
+    img = image([[100, 100, 100, 77], [np.nan, np.nan, np.nan, 0]], bands="RGBA")
+    out = channel_curves(img, xp=[0, 255], red=[0, 127.5], green=[0, 255], blue=[0, 255])
+    assert levels(out.sel(bands=["R", "A"]).isel(x=[0])) == [[50, 77]]
+    assert np.isnan(out.sel(bands="R").values[0, 1])
+
+
+def test_colour_by_brightness_drops_the_hue():
+    # Both pixels are equally bright, so they get the same colour.
+    out = colour_by_brightness(image([[90, 60, 30], [60, 60, 60]]), xp=[0, 60, 255],
+                               red=[0, 200, 255], green=[0, 100, 255], blue=[0, 50, 255])
+    assert levels(out) == [[200, 100, 50], [200, 100, 50]]
+
+
+def test_uniform_luminance_keeps_alpha_and_missing_pixels():
+    img = image([[30, 128], [200, 51], [np.nan, 0]], bands="LA")
+    out = uniform_luminance(img, level=255)
+    assert levels(out.isel(x=[0, 1])) == [[255, 128], [255, 51]]
+    assert np.isnan(out.sel(bands="L").values[0, 2])
+
+
+def test_only_the_coldest_cloud_tops_are_opaque_so_storms_keep_their_shading():
+    from pathlib import Path
+
+    import yaml
+    from pyresample.geometry import AreaDefinition
+    from satpy.composites.mask import HighCloudCompositor
+
+    config = Path(__file__).parents[1] / "src/georing/satpy/composites/visir.yaml"
+    text = config.read_text().replace("!!python/name:", "")
+    layer = yaml.safe_load(text)["composites"]["georing_high_clouds"]
+    kwargs = {k: layer[k] for k in ("transition_min_limits", "transition_max", "transition_gamma")}
+    area = AreaDefinition("equator", "", "", "EPSG:4326", 4, 1, (0, -0.5, 4, 0.5))
+    bt = xr.DataArray(da.from_array(np.array([[300.0, 250.0, 200.0, 180.0]]), chunks=(1, 4)), dims=("y", "x"),
+                      coords={"y": [0.0], "x": [0.5, 1.5, 2.5, 3.5]},
+                      attrs={"area": area})
+    alpha = HighCloudCompositor("high", **kwargs)([bt]).sel(bands="A").values[0]
+    assert alpha[0] == 0 and alpha[-1] == 1
+    # Tops at 200 K, a deep storm's, are still partly see-through.
+    assert 0.5 < alpha[2] < 1

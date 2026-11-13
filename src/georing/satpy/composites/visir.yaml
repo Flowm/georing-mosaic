@@ -1,0 +1,108 @@
+# The Recipe: true colour by day, infrared clouds over city lights by night,
+# blended across the terminator. This file holds what every sensor shares;
+# abi.yaml, ahi.yaml and fci.yaml name each sensor's bands for the day layer.
+# It follows satpy's geo_color and departs from it where the Comparison scenes
+# showed a difference from CIRA's GeoColor.
+sensor_name: visir
+
+modifiers:
+  # satpy's 1 / cos(sun zenith) normalisation, held constant beyond
+  # correction_limit and faded to nothing at max_sza.
+  georing_sunz:
+    modifier: !!python/name:satpy.modifiers.SunZenithCorrector
+    correction_limit: 80
+    max_sza: 95
+    optional_prerequisites:
+      - solar_zenith_angle
+
+  # satpy's Rayleigh correction, faded out toward the terminator. At full
+  # strength it removes more blue than a low sun puts in, and dusk turns olive.
+  # 0.64 um names the red band of all three sensors; satpy's own 0.67 um lies
+  # outside AHI's.
+  georing_rayleigh:
+    modifier: !!python/name:satpy.modifiers.PSPRayleighReflectance
+    atmosphere: us-standard
+    aerosol_type: rayleigh_only
+    reduce_lim_low: 70
+    reduce_lim_high: 88
+    reduce_strength: 0.9
+    prerequisites:
+      - wavelength: 0.64
+        modifiers: [georing_sunz]
+    optional_prerequisites:
+      - satellite_azimuth_angle
+      - satellite_zenith_angle
+      - solar_azimuth_angle
+      - solar_zenith_angle
+
+composites:
+  georing:
+    compositor: !!python/name:satpy.composites.fill.DayNightCompositor
+    lim_low: 78
+    lim_high: 88
+    standard_name: georing
+    prerequisites:
+      - georing_day
+      - georing_night
+
+  georing_night:
+    compositor: !!python/name:satpy.composites.fill.BackgroundCompositor
+    standard_name: night_ir_with_background
+    prerequisites:
+      - georing_high_clouds
+      - georing_night_ground
+
+  # The infrared window band as a white sheet whose opacity follows the
+  # cloud-top temperature. CIRA draws it white (Miller et al. 2020, Eq. 8);
+  # satpy's geo_color greys it by temperature as well, which leaves cold clear
+  # ground and low cloud dark. The opacity ramps from 296 K to 185 K in the
+  # tropics and 205 K poleward of 60 degrees: only the coldest tops are
+  # opaque, so deep convection keeps its shading. satpy's ramp ends at
+  # 210/230 K and turned such cloud into a flat white. The ramp was read off
+  # the night pixels of the tuning scenes, storms among them.
+  georing_high_clouds:
+    compositor: !!python/name:satpy.composites.mask.HighCloudCompositor
+    standard_name: georing_high_clouds
+    transition_min_limits: [185, 205]
+    transition_max: 296
+    transition_gamma: 1.0
+    prerequisites:
+      - wavelength: 10.4
+
+  georing_night_ground:
+    compositor: !!python/name:satpy.composites.fill.BackgroundCompositor
+    standard_name: night_ir_with_background
+    prerequisites:
+      - georing_low_clouds
+      - georing_city_lights
+
+  # Low cloud by night: the 10.4 - 3.9 um difference, opaque light blue from
+  # 4 K up. satpy's geo_color starts the ramp at 1.5 K over land for FCI and
+  # at 0 K for ABI and AHI; CIRA's GeoColor starts near 0 K on every sensor,
+  # which tints dry ground (lower emissivity at 3.9 um) bluish-lilac.
+  georing_low_clouds:
+    compositor: !!python/name:satpy.composites.mask.LowCloudCompositor
+    standard_name: geo_color_low_clouds
+    values_water: 0
+    values_land: 100
+    range_land: [0.0, 4.0]
+    range_water: [0.0, 4.0]
+    prerequisites:
+      - compositor: !!python/name:satpy.composites.arithmetic.DifferenceCompositor
+        prerequisites:
+          - {wavelength: 10.4, calibration: brightness_temperature}
+          - {wavelength: 3.9, calibration: brightness_temperature}
+      - {wavelength: 10.4, calibration: brightness_temperature}
+      - georing_land_water_mask
+
+  # The two static images are files under SATPY_DATA_DIR. georing.static
+  # fetches them and checks them against their checksums.
+  georing_land_water_mask:
+    compositor: !!python/name:satpy.composites.aux_data.StaticImageCompositor
+    standard_name: land_water_mask
+    filename: composites/gshhs_land_water_mask_3km_i.tif
+
+  georing_city_lights:
+    compositor: !!python/name:satpy.composites.aux_data.StaticImageCompositor
+    standard_name: georing_city_lights
+    filename: composites/BlackMarble_2016_3km_geo.tif
