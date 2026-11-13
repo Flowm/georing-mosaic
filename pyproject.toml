@@ -24,6 +24,7 @@ dependencies = [
 ]
 
 [project.scripts]
+georing-compare = "georing.compare:main"
 georing-static = "georing.static:main"
 
 [build-system]
