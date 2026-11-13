@@ -414,6 +414,12 @@ client to one version: a client newer than a self-hosted server is unsupported.
 - JPEG XL cannot be written with the pip wheels, only with a conda-built GDAL.
 
 **Reading in satvis (a later change, in that repository)**
+- The timeline comes from `mosaic/collection.json` alone: each `rel: "item"`
+  link has `datetime`, the Slot, equal to its Item's `properties.datetime`.
+  Before 2026-11-13 the Slot had to be read off the file name
+  (`georing_mosaic_20261113T1500Z.json`), and satvis falls back to that while
+  the field is missing. Fetching every Item instead costs one request per
+  Slot kept: 168 for a week.
 - A Mosaic's file is replaced under the same name when its Slot is rebuilt for
   a late Disk, and the new file's tiles lie at other offsets. A reader must
   not use a header on a file it was not read from: it sends `If-Match` with

@@ -128,6 +128,11 @@ class Catalogue:
         The Collection lists every Item. The list is read off the store each
         time, so it holds what is there: also after a rebuild, a backfill or a
         lifecycle rule that removed old Mosaics.
+
+        Each item link carries its Item's ``datetime`` (STAC Common Metadata,
+        which STAC 1.1 allows on links), so a client builds the timeline from
+        the Collection alone. It is read off the key, which ``publish`` names
+        after that same ``datetime``, so the Items need not be fetched.
         """
         items = self.items()
         self.store.write_json("mosaic/collection.json", {
@@ -145,7 +150,8 @@ class Catalogue:
                 {"rel": "root", "href": "../catalog.json", "type": JSON},
                 {"rel": "parent", "href": "../catalog.json", "type": JSON},
                 *(
-                    {"rel": "item", "href": f"./{key.removeprefix('mosaic/')}", "type": "application/geo+json"}
+                    {"rel": "item", "href": f"./{key.removeprefix('mosaic/')}", "type": "application/geo+json",
+                     "datetime": _iso(_slot_of(key))}
                     for key in items
                 ),
             ],

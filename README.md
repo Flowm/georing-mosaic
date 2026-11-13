@@ -26,6 +26,9 @@ mosaic/collection.json            the list of every Mosaic
 mosaic/2026/11/11/<id>.tif        a Mosaic, with its Item <id>.json
 ```
 
+Each Item link in `collection.json` carries the Item's `datetime`, so the list
+of Slots can be read from that one file.
+
 Nothing is ever deleted; how long products are kept is up to you.
 
 The words Slot, Disk, Recipe, Rendering, Mosaic and Seam have exact meanings

@@ -150,6 +150,14 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   per day and the code a walk over the folders. The Item records which Disks
   the Mosaic was built from, which it lacks, and the attribution each provider
   asks for.
+- **Each item link in the Collection carries its Item's `datetime`,** the
+  Slot in RFC 3339 UTC (`2026-11-13T15:00:00Z`), so a client builds the
+  timeline from `collection.json` alone. Consumers may rely on it. STAC 1.1
+  allows Common Metadata on links, and its schemas check the field there. Before
+  2026-11-13 a link carried no time, so a client had to read the Slot off the
+  file name or fetch every Item. If Slots ever get `start_datetime` and
+  `end_datetime`, those go on the links the same way. Item ids, file names and
+  `latest.json` stay as they are, so a client that reads the name still works.
 - **`latest.json`** names the newest Slot that has a Mosaic, with the Disks it
   was built from and the ones it lacks, for clients that want only that, and
   so a consumer can tell when the data is stale.
@@ -283,8 +291,12 @@ reading".
   Slots between 32°S and 32°N. Poleward of 50° it was looked at on the 18:00
   Slot only: the Seams are gone there too, and the Mosaic covers the same
   pixels as at 0.5°.
-- **The catalogue is not checked against the STAC schemas.** The tests follow
-  every link and check the fields we set; no validator has run on it.
+- **The catalogue is not checked against the STAC schemas in the tests.** The
+  tests follow every link and check the fields we set. On 2026-11-13
+  `stac-validator validate --recursive` passed on a catalogue of three Slots
+  written by the index step (the Catalog, the Collection and three Items, all
+  valid STAC 1.1.0). It fetches the schemas over the network, so it is not
+  part of the tests.
 - **Output to a real bucket.** The compose stack has written to a Cloudflare
   R2 bucket since 2026-11-12. On 2026-11-13 it built the eleven Slots from
   03:00 to 13:00 on its schedule, each with all four Disks, in 14.5 to 16.8

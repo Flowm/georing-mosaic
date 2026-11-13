@@ -111,3 +111,21 @@ def test_the_collection_follows_what_is_removed_from_the_store(tmp_path):
     assert links(read(out / "mosaic/collection.json"), "item") == ["./2026/11/10/georing_mosaic_20261110T1800Z.json"]
     assert read(out / "mosaic/collection.json")["extent"]["temporal"]["interval"] == [
         ["2026-11-10T18:00:00Z", "2026-11-10T18:00:00Z"]]
+
+
+def test_every_item_link_carries_its_items_datetime(tmp_path):
+    out = tmp_path / "out"
+    catalogue = Catalogue(Directory(out))
+    for slot in (datetime(2026, 11, 7, 6, tzinfo=UTC), SLOT, datetime(2026, 11, 10, 19, tzinfo=UTC)):
+        publish(catalogue, tmp_path, slot)
+    # Rebuilt after a late Disk, and the oldest removed by a lifecycle rule.
+    publish(catalogue, tmp_path, SLOT, ["goes-east", "goes-west"])
+    for path in (out / "mosaic/2026/11/07").iterdir():
+        path.unlink()
+    catalogue.index()
+
+    collection = out / "mosaic/collection.json"
+    item_links = [link for link in read(collection)["links"] if link["rel"] == "item"]
+    assert [link["datetime"] for link in item_links] == ["2026-11-10T18:00:00Z", "2026-11-10T19:00:00Z"]
+    for link in item_links:
+        assert link["datetime"] == read(collection.parent / link["href"])["properties"]["datetime"]
