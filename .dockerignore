@@ -1,0 +1,8 @@
+*
+!pyproject.toml
+!uv.lock
+!LICENSE
+!src
+!prefect.yaml
+!worker.sh
+**/__pycache__

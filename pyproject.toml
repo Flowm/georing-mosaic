@@ -24,6 +24,8 @@ dependencies = [
 ]
 
 [project.scripts]
+georing-slot = "georing.cli:slot_main"
+georing-backfill = "georing.cli:backfill_main"
 georing-compare = "georing.compare:main"
 georing-static = "georing.static:main"
 

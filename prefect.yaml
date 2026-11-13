@@ -1,0 +1,22 @@
+# The deployment the worker registers when it starts.
+name: georing
+prefect-version: 3.9.2
+
+# Without this, Prefect records the directory of whoever ran `prefect deploy`.
+pull:
+  - prefect.deployments.steps.set_working_directory:
+      directory: /app
+
+# The flow is named after the project, so the deployment is
+# georing-slot/hourly. A backfill is runs of the same deployment for past
+# Slots, queued with the georing-backfill command.
+deployments:
+  # One run per Slot. At 10 past the hour the scans that started on the hour
+  # begin to arrive; the flow polls for them until the deadline.
+  - name: hourly
+    entrypoint: src/georing/flow.py:build_slot
+    work_pool:
+      name: georing
+    schedules:
+      - cron: "10 * * * *"
+        timezone: UTC

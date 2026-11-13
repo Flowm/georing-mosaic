@@ -1,0 +1,56 @@
+# The Prefect server and the worker that builds the Slots (ADR 0003).
+#
+#   mkdir -p out && docker compose up -d --build
+#
+# The UI is at http://localhost:4200. Products and the catalogue go to ./out,
+# or to the bucket that GEORING_OUTPUT_URL names in .env. The EUMETSAT and the
+# bucket's key and secret come from .env too (see .env.example).
+services:
+  server:
+    image: prefecthq/prefect:3.9.2-python3.14
+    command: prefect server start --host 0.0.0.0
+    environment:
+      # SQLite under /data; flow runs and events are pruned, or they grow without limit.
+      PREFECT_HOME: /data
+      PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED: events,flow_runs
+    volumes:
+      - prefect:/data
+    ports:
+      - 127.0.0.1:4200:4200
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+    restart: unless-stopped
+
+  worker:
+    build: .
+    image: georing:latest
+    depends_on:
+      server:
+        condition: service_healthy
+    # Run as the owner of ./out, so that the products are not root's.
+    user: "${GEORING_UID:-1000}:${GEORING_GID:-1000}"
+    env_file: .env
+    environment:
+      PREFECT_API_URL: http://server:4200/api
+      GEORING_OUTPUT_URL: ${GEORING_OUTPUT_URL:-/data/out}
+      GEORING_WORK_DIR: /data/work
+    volumes:
+      # ./out must exist. Docker would create it as root's, and the worker
+      # could not write its first Slot.
+      - type: bind
+        source: ./out
+        target: /data/out
+        bind:
+          create_host_path: false
+      - work:/data/work
+    # No CPU or memory limit is set here: the worker takes 8 CPUs for each
+    # render it runs at once (GEORING_PARALLEL_RENDERS in .env) and pins its
+    # steps to them. One render at a time fits 8 CPUs and 32 GB.
+    restart: unless-stopped
+
+volumes:
+  prefect:
+  work:
