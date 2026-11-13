@@ -1,0 +1,37 @@
+[project]
+name = "georing"
+version = "0.1.0"
+description = "Hourly colour imagery of the whole Earth from raw geostationary satellite scans"
+requires-python = ">=3.14,<3.15"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "satpy==0.60.0",
+    "pyresample==1.35.0",
+    "pyspectral==0.14.3",
+    "pyorbital==1.14.0",
+    "rasterio==1.5.2",
+    "rioxarray",
+    "eumdac==3.1.1",
+    "boto3",
+    "netCDF4",
+    "hdf5plugin",
+    "numpy",
+    "dask",
+    "xarray",
+    "prefect==3.9.2",
+    "pydantic-settings>=2.16.2",
+]
+
+[project.scripts]
+georing-static = "georing.static:main"
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.4",
+]
