@@ -1,13 +1,16 @@
 # Plan
 
-Agreed in a design session and confirmed by the owner on 2026-11-11. No code
-exists yet.
+Agreed in a design session and confirmed by the owner on 2026-11-11. Milestones
+one to four of "Build order" are built: the compose stack builds a Slot every
+hour, `georing-slot` builds one from a shell with the same flow,
+`georing-backfill` queues past Slots, and `georing-compare` judges the Recipe
+on the Comparison scenes.
 
 Terms in capitals are defined in `GLOSSARY.md`. Reasons for the four decisions
 that were real trade-offs are in `docs/adr/`; this file does not repeat them.
-
-Facts below were looked up on 2026-11-10 and 2026-11-11 from primary sources or
-live probes, unless marked *(unverified)* or listed under "Estimates".
+What was looked up and measured on the way, such as the data sources, the
+behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
+[notes.md](notes.md).
 
 ## Decisions
 
@@ -23,29 +26,57 @@ live probes, unless marked *(unverified)* or listed under "Estimates".
 
 ### Products
 
-- **Each Slot publishes five files:** one Mosaic and four Renderings.
+- **Each Slot publishes one file, its Mosaic.** The four Renderings were
+  published too at first, as COGs in each satellite's own view at 0.5 km.
+  They were taken out on 2026-11-12: satvis, the one consumer, reads only the
+  Mosaic, and they were half the storage and four encodes per Slot.
 - **Rendering:** the satellite's own geostationary projection at native 0.5 km,
-  as a COG in lossy WebP at quality 90. Lossless is a setting, for exact
-  comparison against GeoColor.
-- **Mosaic:** Web Mercator at zoom 8 with 512 px tiles aligned to the web tile
-  grid (ADR 0001), lossy WebP at quality 90 (ADR 0004).
-- **Recipe:** start from satpy's built-in `geo_color` composite, unchanged, for
-  all three sensors. Then tune a Recipe of our own toward GeoColor
-  ([Miller et al. 2020](https://journals.ametsoc.org/view/journals/atot/37/3/JTECH-D-19-0134.1.xml))
-  on the Comparison scenes. The owner judges when it is close enough.
-- **Comparison scenes:** day, night, terminator, sun glint, snow, dust. The
-  references are NASA GIBS (`GOES-East_ABI_GeoColor`, `GOES-West_ABI_GeoColor`),
-  EUMETView (`mtg_fd:rgb_geocolour`) and CIRA SLIDER (Himawari `geocolor`).
-- **Seam:** a narrow feathered band, written in our own code. satpy's
-  multi-scene blend is experimental and a wide weighted average shows high
-  clouds twice. The width is tuned on real images.
+  written lossless to scratch, where the Mosaic is joined from it and
+  compressed once.
+- **Mosaic:** Web Mercator at the resolution of zoom 8 (611 m per pixel at the
+  equator, 65,536 px across) in 512 px tiles aligned to the web tile grid
+  (ADR 0001), lossy WebP at quality 90 (ADR 0004). The full-resolution tiles
+  are the 512 px web tiles of level 7, and each overview is the level below.
+- **Recipe:** our own satpy composite, `georing`, under `src/georing/satpy`.
+  It keeps the structure of satpy's `geo_color` and is tuned toward CIRA's
+  GeoColor ([Miller et al.
+  2020](https://journals.ametsoc.org/view/journals/atot/37/3/JTECH-D-19-0134.1.xml))
+  on the tuning set of Comparison scenes and checked on the holdout set. What
+  it changes and what is left is in the notes, under "Recipe". The owner
+  judges when it is close enough; that judgement is open.
+- **Comparison scenes:** a tuning set of thirteen on 2026-11-10, which the
+  Recipe is fitted to, and a holdout set of eight on 2026-09-14 at other
+  places, which is only measured; listed in the notes, under "Recipe". The
+  reference for all four satellites is CIRA's GeoColor from SLIDER, in each
+  satellite's own view at 1 km. `georing-compare` renders each scene and
+  writes it beside its reference.
+- **Seam:** a feathered band, written in our own code. satpy's multi-scene
+  blend is experimental and a wide weighted average shows high clouds twice.
+  The band is where the two view angles differ by less than 5°, about 470 km
+  on the ground between the two GOES. The width was chosen on the
+  Slots of 2026-11-10 18:00 and 06:00 joined at 0.5°, 2°, 5° and 10°: 0.5°
+  and 2° leave a line where the two satellites see haze, glint or dawn in
+  different colours (off Brazil by day, at the date line at dawn, over India
+  by day); 5° is the narrowest that turns each into a gradient; at 10° cloud
+  is plainly doubled, most of all at 70°E. The mean gradient in the band falls
+  to 0.92–0.97 of its value at 0.5° with 5°, and to 0.83–0.93 with 10°.
+- **Limb:** a Rendering is not used where its satellite is more than 85° from
+  vertical. Beyond that the pixels are smeared streaks. This opens a gap
+  around 70°E poleward of about 45° latitude. The limit was tuned on
+  real images like the Seam.
 - **Deadline:** a Slot builds as soon as all four Disks are present, typically
   from 14 minutes past the hour. At 35 minutes past it builds without any Disk
-  still missing. The measurement behind 35 is under "Data sources, arrival
+  still missing. The measurement behind 35 is in the notes, under "Arrival
   times".
 - **Missing Disk:** the neighbours fill what they can see and the rest stays
   transparent. The catalogue records which Disks contributed. A Disk that
-  arrives later causes the Slot to be rebuilt and replaced. Imagery from
+  arrives later causes the Slot to be built again from all its Disks, and
+  replaced if that adds a Disk. Joining the late Disk with the published
+  Renderings of the others would save about 12 minutes and 3 GB per rebuild,
+  for about one Slot in ten; it was built first and taken out, because it
+  was the most delicate path in the flow and made a rebuilt Mosaic from
+  lossy copies. A rebuild replaces a Mosaic only by a better one: a rebuild
+  that would lose a Disk, or add none, publishes nothing. Imagery from
   another Slot is never used as a stand-in, and that includes the same
   satellite's scan at 10 minutes past: a possible later addition for GOES and
   Himawari, ruled out for Meteosat by ADR 0002.
@@ -54,29 +85,102 @@ live probes, unless marked *(unverified)* or listed under "Estimates".
 
 - **One Prefect flow per Slot,** with the Slot time as its parameter, scheduled
   at 10 minutes past each hour. The same flow serves backfills and rebuilds.
-- **Steps:** per satellite a download step that polls with retries until its
-  files exist, then a render step; then one mosaic step; then one index step.
-- **At most two renders run at once,** to stay inside the worker's memory.
+  A scheduled run builds the hour it was scheduled in, however late it
+  starts: after an outage the worker runs the runs it missed, and each must
+  build its own hour. A Slot that has not begun is refused.
+- **One flow, named after the project.** The flow is `georing-slot`, and a
+  run is named after its Slot, such as `georing-slot-20261111T2000Z`, so that
+  it can be told apart on a Prefect server shared with other projects. There
+  is no second flow for backfills: a backfill is runs of the same flow for
+  past Slots. Prefect's scheduler gives the runs it creates ahead
+  random names and a run names itself only when it starts, so each run also
+  names the ones still waiting.
+- **Steps:** per satellite a download step that polls once a minute until its
+  files exist or the deadline passes, then a render step; then the Mosaic's
+  join, encode and publish steps; then one index step. Each step that computes
+  runs in a child process of its own (`georing.step`). A step that has not
+  finished after 30 minutes (the slowest takes five) is killed, with whatever
+  it started, and counts as failed. A step inherits none of the EUMETSAT and
+  bucket credentials and has only those it is handed: Meteosat's download and
+  the look-back for late Disks get the EUMETSAT key.
+- **One Disk's failure does not cost the Slot.** A Disk that cannot be
+  downloaded or rendered is left out and recorded as missing.
+- **Scratch is removed when a run ends,** failed or not. What a run that was
+  killed leaves is removed by a later run once nothing has touched it for
+  three hours.
+- **Late Disks:** after its own Slot, the run of the hour looks back over the
+  last 48 Slots and queues a rebuild for each one that
+  lacks a Disk its source now holds. A Slot with no Mosaic at all, whose run
+  failed or never started, lacks every Disk; it counts for six hours, and only
+  if an older Mosaic exists, so neither a new deployment nor a long outage
+  builds days of Slots unasked. A longer gap is a backfill. The same rebuild
+  is queued once; one that fails is not tried again by itself, because a
+  rebuild is a full build and a Disk that cannot be built would fill the
+  catch-up queue. A backfill tries again. A source that cannot be asked is
+  asked again next hour and does not fail the run. The sources are asked in a
+  step of its own, under the time limit, and never from the flow's own
+  process.
+- **One flow run at a time:** the worker starts with `--limit 1`.
+- **Catching up never holds up the Slot of the hour.** Rebuilds and backfilled
+  Slots wait in a work queue of their own, `catch-up`, which the worker serves
+  after the default one. A run that has started is not interrupted.
+- **Backfill:** the command `georing-backfill START [END]`, run in the worker
+  container, queues a run of `georing-slot/hourly` for every Slot in that time
+  that is not done or lacks a Disk, newest first, in the catch-up queue. With
+  `--force` it queues every Slot, to build each again whatever it has. It was
+  a flow of its own at first; that put a second flow on the server whose runs
+  built nothing. Beside the hourly run there is room for one or two caught-up
+  Slots an hour.
+- **Renders run one at a time,** in the order their Disks arrive, so a late
+  Disk does not hold up the others. Each render uses all eight cores, so two
+  at once would finish no sooner, and the Meteosat render peaks at 21 GB.
+  On a larger machine the setting `parallel_renders`
+  (`GEORING_PARALLEL_RENDERS` in `.env`) runs several at once. The worker
+  then uses eight cores for each, as one pool: a render keeps to eight
+  threads, the join and encode use them all. The compose file sets no CPU or
+  memory limit: every step pins itself to that pool.
 - **No push notifications.** The AWS and EUMETSAT feeds exist but are not used.
 
 ### Catalogue and storage
 
-- **Static STAC,** written as JSON files beside the products: a root
-  `catalog.json`; two Collections, `mosaic` and `rendering`; one Item per Slot
-  in `mosaic`; one Item per satellite per Slot in `rendering`. Each Mosaic Item
-  links to the Renderings it was built from. Items are grouped under one
-  catalogue file per day.
-- **`latest.json`** names the newest complete Slot, for clients that want only
-  that, and so a consumer can tell when the data is stale.
+- **Static STAC,** written as JSON files beside the Mosaics: a root
+  `catalog.json`, one Collection `mosaic` that lists every Item, and one Item
+  per Slot. A reader has every Slot after two requests. Until 2026-11-13 the
+  Collection listed one catalogue file per day, which cost a reader a request
+  per day and the code a walk over the folders. The Item records which Disks
+  the Mosaic was built from, which it lacks, and the attribution each provider
+  asks for.
+- **`latest.json`** names the newest Slot that has a Mosaic, with the Disks it
+  was built from and the ones it lacks, for clients that want only that, and
+  so a consumer can tell when the data is stale.
+- **Links are relative** and Items sit beside their products, so the tree can
+  be served from any prefix. The layout is in `src/georing/catalogue.py`.
 - **Each Item carries the attribution** its data providers ask for.
 - **The catalogue is the record of which Slots are done** (ADR 0003).
-- **The output location is a URL setting:** a host directory in the compose
-  file, an `s3://` bucket (Cloudflare R2) later. Paths start with the product
-  and then the date: `mosaic/YYYY/MM/DD/…`, `rendering/YYYY/MM/DD/…`.
-- **Retention is the bucket's job:** one lifecycle rule per product prefix,
-  Mosaics 7 days and Renderings 2 days. The index step rewrites each
-  Collection's list of days from what exists, so no link dangles. In
-  host-directory mode the index step itself deletes day folders past retention.
+- **The output location is a URL setting,** `output_url`: a path for a host
+  directory, the default, or `s3://bucket/prefix` for a bucket (Cloudflare R2
+  is the one meant). `georing.storage` holds the two behind one interface.
+  Paths start with the product and then the date: `mosaic/YYYY/MM/DD/…`.
+- **A bucket is reached with settings of our own,** `GEORING_S3_ENDPOINT_URL`,
+  `GEORING_S3_ACCESS_KEY_ID` and `GEORING_S3_SECRET_ACCESS_KEY` in `.env`, not
+  with the `AWS_` variables: those would also reach the anonymous client that
+  downloads from NOAA's buckets, and an endpoint set there sends the
+  downloads to the wrong host. The key needs to read and write objects; it
+  needs no delete, because an upload to a bucket shows up only when complete
+  and nothing is renamed.
+- **JSON in a bucket is stored with `Cache-Control: no-cache`:** every
+  catalogue file is rewritten as Slots arrive.
+- **The pipeline deletes no product.** How long Mosaics are kept is for
+  whoever runs it: a lifecycle rule on a bucket, or nothing at all for a
+  directory, which is meant for testing and grows by up to 10 GB a day.
+- **The index step lists the store and rewrites the Collection, the root and
+  `latest.json`.** The list is read off the store each time, so it follows a
+  rebuild, a backfill and whatever a lifecycle rule removes. Its cost grows
+  with what is kept: 124 bytes of list and two keys to look through per Slot,
+  which is 1.1 MB and 18 list requests after a year kept in full. An Item is
+  written after its image and never again, so an Item means both are there;
+  where a lifecycle rule removes them, one rule for the `mosaic/` prefix keeps
+  it so.
 - **Raw downloads** live on the worker's scratch disk and are removed when
   their Slot finishes.
 
@@ -84,35 +188,49 @@ live probes, unless marked *(unverified)* or listed under "Estimates".
 
 - **Compose file with two services:** the Prefect server as a single container
   on SQLite with no Redis, and the worker (ADR 0003).
-- **Worker size:** 8 cores and 32 GB of RAM, to be raised if the first
-  milestone shows it is too small.
-- **Python 3.14,** with 3.13 as the fallback. Prefect supports 3.15, but
-  `pyresample`, `pykdtree`, `h5py`, `numcodecs` and `bottleneck` publish wheels
-  only up to 3.14. satpy 0.60.0's own tests stop at 3.13.
+- **Worker size:** 8 cores and 32 GB of RAM. Milestone one built both test
+  Slots inside that: 23 minutes per Slot and a peak of 21 GB.
+- **Python 3.14.** Prefect supports 3.15, but `pyresample`, `pykdtree`, `h5py`,
+  `numcodecs` and `bottleneck` publish wheels only up to 3.14. satpy 0.60.0's
+  own tests stop at 3.13, but it built both test Slots on 3.14.7; the two
+  workarounds that needed are in the notes, under "Python 3.14".
 - **`uv`** for dependencies, and one Docker image for the worker. The server
   uses Prefect's official image at the same pinned version.
 - **satpy is pinned to a release.** Its static files are fetched when the image
   is built, so a run downloads only satellite data.
-- **Settings** live in one YAML file (satellite set, resolution, compression,
-  retention, output URL), each overridable by an environment variable.
+- **Settings** are what differs between places it runs: the satellite set, the
+  output URL and the bucket's address and key, the work and static
+  directories, the cores a render uses and how many renders run at once.
+  Their defaults are in `src/georing/settings.py`, and an environment variable
+  named `GEORING_` and the setting overrides each; a deployment keeps them in
+  `.env`. What nothing
+  varies is a constant beside the code that uses it: the Seam width, the limb
+  limit, the WebP quality, the deadline and the step time limit.
 - **The EUMETSAT key and secret** come from the environment variables
   `EUMETSAT_CONSUMER_KEY` and `EUMETSAT_CONSUMER_SECRET`, kept in a `.env`
   file that git ignores (`.env.example` shows the shape).
 - **Deployments** are declared in `prefect.yaml` and registered when the worker
-  container starts.
+  container starts: `georing-slot/hourly`, on the schedule.
+- **The worker runs as the owner of the output directory,** not as root, so
+  the products in a host directory belong to that user: user 1000, unless
+  `GEORING_UID` and `GEORING_GID` in `.env` name another.
 - **Names:** the repository is `georing-mosaic`; the Python package, Docker
   image and bucket prefix are `georing`.
 - **Alerting:** none in the first version beyond the Prefect UI.
-- **Licence:** private at first; public under MIT once a first Mosaic exists.
+- **Licence:** MIT, in `LICENSE` since 2026-11-12. The repository is private at
+  first.
 
 ### Consumer
 
 satvis reads the Mosaic directly from the bucket. That is a separate change in
-the satvis repository; what it needs is under "COG, writing and reading".
+the satvis repository; what it needs is in the notes, under "COG, writing and
+reading".
 
 ## Build order
 
-1. **One Slot as a plain script, without Prefect.** Done when all of these hold:
+1. **One Slot as a plain script, without Prefect.** Done on 2026-11-11: all of
+   these held then. The report of each step was removed once its figures
+   were in the notes.
    - For one daytime Slot and one night-time Slot it writes four Renderings and
      a Mosaic to a directory.
    - It reports, per step, wall time, peak memory, bytes downloaded and output
@@ -121,11 +239,15 @@ the satvis repository; what it needs is under "COG, writing and reading".
      overview level.
    - It ran on a machine no larger than 8 cores and 32 GB, or the report says
      what size it needed.
-   - Each figure under "Estimates" is replaced by its measurement.
+   - Each estimate is replaced by its measurement; they are in the notes,
+     under "Measurements".
 2. **Comparison scenes** against the reference products, and the Recipe tuning
-   that follows from them.
-3. **The Prefect flow and the compose file.**
-4. **Backfill.**
+   that follows from them. Built on 2026-11-11; the owner's judgement is open.
+3. **The Prefect flow and the compose file.** Built on 2026-11-11. The stack
+   built the Slot of 09:00 UTC that day on its schedule: started at 09:10,
+   done at 09:32, with all four Disks.
+4. **Backfill.** Built on 2026-11-11. A backfill of 04:00 and 05:00 UTC built
+   both Slots, newest first.
 5. **The satvis layer,** in the satvis repository.
 
 ## Open items
@@ -137,252 +259,42 @@ the satvis repository; what it needs is under "COG, writing and reading".
   a Slot, or poll the search API for several hours (about one such scan every
   two hours). If they were, nearly every Slot is complete by 17 past and the
   deadline can come down from 35.
-- **EUMETSAT account.** The owner will create one; downloads need its key.
-- **Overview alignment.** Unconfirmed until checked on a real Mosaic (ADR 0001).
 - **Cross-origin range requests on R2.** Whether a public R2 bucket needs extra
   CORS settings for them is unknown.
-- **Python 3.14.** Untested with satpy 0.60.0; milestone one will show.
+- **Meteosat render memory.** It peaks at 21 GB where the other three peak
+  at 11 to 12 GB, and the cause is not found. With four dask workers it is
+  14 GB but takes more than twice as long.
+- **The owner's judgement of the Recipe.** The side-by-side images are in
+  `work/comparison/georing/` after `georing-compare`, those of the Recipe
+  before it was tuned in `work/comparison/baseline-4beb0f0/`. The holdout set
+  says the night changes hold on another day; the terminator, Himawari's sun
+  glint and snow miss their targets. What still differs from CIRA is listed in
+  the notes, under "Recipe".
+- **The references are not kept.** SLIDER holds some weeks, and the copies
+  under `work/comparison/reference/` are not in git: they are CIRA's images.
+  Decide where the Comparison scenes' references and Disks are to live.
+- **The two sides of a Seam differ in colour.** The 5° feather turns the line
+  into a gradient; the difference itself remains. Off Brazil at 18:00
+  Meteosat's side of the sea is grey-beige and GOES-East's blue; at the date
+  line at dawn Himawari's side is grey and GOES-West's blue; at 70°E, viewed
+  at a low angle from both sides, haze differs by day. Each satellite looks at
+  the same sea from another side of the sun, so the Recipe would have to
+  correct for the direction of view to close it. The feather was chosen on two
+  Slots between 32°S and 32°N. Poleward of 50° it was looked at on the 18:00
+  Slot only: the Seams are gone there too, and the Mosaic covers the same
+  pixels as at 0.5°.
+- **The catalogue is not checked against the STAC schemas.** The tests follow
+  every link and check the fields we set; no validator has run on it.
+- **Output to a real bucket.** The compose stack has written to a Cloudflare
+  R2 bucket since 2026-11-12. On 2026-11-13 it built the eleven Slots from
+  03:00 to 13:00 on its schedule, each with all four Disks, in 14.5 to 16.8
+  minutes with two renders at once on 32 CPUs. The publish step of the 13:00
+  Slot took 5 s for a Mosaic of 328 MB. Read back through the S3 interface on
+  2026-11-12, a Mosaic answered a byte-range request with 206 and an
+  `If-Match` with a wrong ETag with 412. Not yet checked: reading it over the
+  bucket's public address and from a browser (cross-origin), and lifecycle
+  rules.
 - **The India seam.** Around 70°E both Meteosat and Himawari view the ground at
   about 80° from vertical, so quality there is poor. This is a known limit of
-  the first version. The candidates checked and why each fails are under
-  "Data sources".
-
-## Data sources
-
-| Position | Satellite | Longitude | Source | Download per Slot, day / night | Ready after scan end | Credentials |
-|---|---|---|---|---|---|---|
-| GOES-East | GOES-19 | 75.2°W | `s3://noaa-goes19/ABI-L1b-RadF/` | 660 / 270 MB | 10–110 s | none |
-| GOES-West | GOES-18 | 137°W | `s3://noaa-goes18/ABI-L1b-RadF/` | 662 / 279 MB | 10–110 s | none |
-| Himawari | Himawari-9 | 140.7°E | `s3://noaa-himawari9/AHI-L1b-FLDK/` | 652 / 271 MB | 0.5–4.5 min | none |
-| Meteosat 0° | MTG-I1 | 0° | EUMETSAT Data Store, `EO:EUM:DAT:0662` and `EO:EUM:DAT:0665` | 1.03 / 0.47 GB and 1.04 / 0.56 GB | about 4.5 min | key and secret |
-
-The sizes are from one day (2026-11-10), for the bands listed below. All three
-buckets are in `us-east-1` and allow anonymous access.
-
-**GOES (ABI)**
-- Key: `<YYYY>/<DOY>/<HH>/OR_ABI-L1b-RadF-M6C<bb>_G19_s<YYYYDOYHHMMSSt>_e…_c….nc`,
-  one NetCDF file per band per scan (`G18` for GOES-West).
-- Bands: C01 blue, C02 red (0.5 km), C03 0.86 µm, C07 3.9 µm, C13 10.3 µm. ABI
-  has no green band; the Recipe synthesises it.
-- Scans start at 20 seconds past each 10 minutes. C02 arrives last.
-- `ABI-L2-MCMIPF` holds all bands in one 369 MB file at 2 km. It is not used,
-  because it discards detail.
-
-**Himawari (AHI)**
-- Key: `<YYYY>/<MM>/<DD>/<HHMM>/HS_H09_<YYYYMMDD>_<HHMM>_B<bb>_FLDK_R<rr>_S<ss>10.DAT.bz2`.
-  Ten segments per band.
-- Bands: B01 blue, B02 green, B03 red (0.5 km), B04 0.86 µm, B07 3.9 µm,
-  B13 10.4 µm: 60 files.
-- No scans exist at 02:40 and 14:40. Hourly Slots never use them.
-
-**Meteosat 0° (FCI)**
-- `0662` is the normal-resolution collection (1 km visible, 2 km infrared, all
-  16 channels). `0665` is the high-resolution one (four channels, including
-  0.5 km red). Both are needed.
-- One scan is 40 body chunks plus one trailer per collection. Every chunk holds
-  every channel, so there is no per-band download.
-- Sensing runs from 7 seconds past to 9 minutes 23 seconds past.
-- Client: `eumdac` 3.1.1. Search is anonymous; download needs a bearer token
-  from a consumer key and secret (`https://api.eumetsat.int/api-key/`).
-- Rate limits exist (the client handles HTTP 429) but are not published.
-
-**Arrival times**
-
-Measured over 720 hourly Slots, 2026-10-11 to 2026-11-10: minutes past the
-hour at which the on-the-hour scan was complete. For the buckets this is the
-latest `LastModified` among the needed files; for Meteosat it is the product's
-`updated` time in the anonymous search API, which a live poll showed to be
-within a minute of the product first appearing. No download with a token was
-attempted.
-
-| Source | Median | 99th percentile | Slots with no on-the-hour scan |
-|---|---|---|---|
-| GOES-East | 10.9 | 11.6 | 1 |
-| GOES-West | 10.9 | 11.6 | 1 |
-| Himawari | 13.9 | 16.8 | 2 |
-| Meteosat, both collections | 14.2 | 31.3 | 1 |
-
-- All four were complete by 15 past in 85% of Slots, by 20 past in 90%, by
-  30 past in 93% and by 45 past in 98.5%.
-- Meteosat's `updated` times fall in two clusters: about nine Slots in ten near
-  14 past, most of the rest near 30 past. The 99th percentile of the joint time
-  is 31.5, which is why the deadline is 35 and not 30.
-- Whether the later cluster is a first publication or a re-publication of a
-  product already downloadable near 14 past is unknown: `updated` keeps only
-  the latest value. See "Open items".
-- Rare long delays exist: two Meteosat Slots many hours late, one Himawari
-  Slot at 101 minutes past.
-- Wherever a satellite had no on-the-hour scan, its scan at 10 past existed.
-
-**Licences and attribution**
-- GOES: open; NOAA asks for attribution and no implied endorsement.
-- Himawari: JMA data distributed by NOAA; both ask for attribution.
-- Meteosat: see ADR 0002. Images made from the data are our own; the required
-  line is "[Contains modified] EUMETSAT Meteosat data [year]".
-
-**Satellites considered for the India seam, and rejected**
-- Meteosat-9 at 45.5°E: its instrument has no blue or green band.
-- GK2A at 128.2°E (`s3://noaa-gk2a-pds`): open, with real colour bands, but too
-  far east to help, 12 to 14 minutes slower, and satpy has no `geo_color` for it.
-- FY-4B at 105°E: data needs a real-name account with order-based pickup, and
-  WMO's registry says its imager failed on 30 July 2026.
-- INSAT and Electro-L: no open download found.
-
-Sources:
-[AWS GOES](https://registry.opendata.aws/noaa-goes/),
-[AWS Himawari](https://registry.opendata.aws/noaa-himawari/),
-[EUMETSAT Data Policy](https://www-cdn.eumetsat.int/files/2026-01/45173%20-%20Data_Policy.pdf),
-[eumdac](https://pypi.org/project/eumdac/),
-[WMO OSCAR](https://space.oscar.wmo.int/satellites).
-
-## satpy
-
-Version 0.60.0 (2026-03-04). The companion versions are pyresample 1.35.0,
-pyspectral 0.14.3 and pyorbital 1.14.0.
-
-**The `geo_color` composite**
-- It exists for `abi`, `ahi` and `fci` only, with the same structure in each:
-  a day layer and a night layer blended between 78° and 88° solar zenith. The
-  night layer is high clouds over low clouds over a city-lights image.
-- The day layers differ in how green is made: `true_color` with a simulated
-  green for ABI, a hybrid of the real green and the near-infrared for AHI and
-  FCI. Check the Seams for a colour step.
-- A Recipe of our own goes in a composite YAML file under `SATPY_CONFIG_PATH`
-  *(unverified: inferred from how satpy loads composites)*.
-- [Issue #3397](https://github.com/pytroll/satpy/issues/3397) proposes a
-  different sun-angle correction for the built-in composites, so the look may
-  change between releases.
-
-**Static files, fetched at image build**
-- `BlackMarble_2016_3km_geo.tif`, 64.4 MB, the city lights. **satpy 0.60.0
-  cannot download it**: NASA moved the file. The working URL is
-  `https://assets.science.nasa.gov/content/dam/science/esd/eo/images/imagerecords/144000/144898/BlackMarble_2016_3km_geo.tif`.
-  Place it at `<data_dir>/composites/StaticImageCompositor/` and set
-  `SATPY_DOWNLOAD_AUX=False` *(unverified: inferred from the source)*.
-- `gshhs_land_water_mask_3km_i.tif`, 0.5 MB, from
-  `https://zenodo.org/records/10076199/files/`.
-- The rest: `satpy_retrieve_all_aux_data --data-dir <dir> --composite-sensors abi ahi fci`.
-- Rayleigh tables: `download_atm_correction_luts.py -a rayleigh_only` (54 MB)
-  and `download_rsr.py` (5 MB). Point pyspectral at them with a YAML file named
-  by `PSP_CONFIG_FILE`, and set `download_from_internet: False` in it.
-
-**Readers**
-- `abi_l1b` for GOES.
-- `ahi_hsd` for Himawari. It decompresses each `.bz2` segment to a temporary
-  file, with `pbzip2` if that is on the path. Allow scratch space for it.
-- `fci_l1c_nc` for Meteosat, given both collections' files together. The data
-  is compressed: `import hdf5plugin` before reading, or the read fails with
-  "NetCDF: Filter error".
-
-**Memory and time**
-- Computing the sun and satellite angles dominates memory.
-- `scn.load([...], generate=False)` before resampling saves time and memory for
-  composites that mix resolutions. With `geo_color` this can fail after one
-  resample ([issue #2733](https://github.com/pytroll/satpy/issues/2733));
-  resampling twice worked there.
-- Settings: dask `array.chunk-size` of `32MiB`, `DASK_NUM_WORKERS` 4 to 8,
-  `OMP_NUM_THREADS=1`, and a raised `GDAL_CACHEMAX`.
-- Maintainers report about 6 GB and under 140 s for a full-disk ABI
-  `true_color`, and 260 to 290 s for AHI with four workers
-  ([issue #1902](https://github.com/pytroll/satpy/issues/1902)). No published
-  figure exists for `geo_color`.
-
-**Joining satellites**
-- `satpy.modifiers.angles.get_satellite_zenith_angle` gives the view angle the
-  Seam is placed by.
-- A worked ring example, with weights `(1 - (satz/90)^2)^2`, is in
-  [issue #2758](https://github.com/pytroll/satpy/issues/2758#issuecomment-2767072725).
-  Its lesson: resample with `reduce_data=False`.
-- For geostationary-to-grid resampling the maintainers recommend
-  `gradient_search`. `native` only changes resolution by whole factors.
-
-**Output**
-- The `geotiff` writer takes `driver="COG"` and passes GDAL's COG options
-  through. satpy has no web-tile writer.
-
-## Prefect
-
-Version 3.9.2 (2026-11-06). Pin the server image, the worker image and the
-client to one version: a client newer than a self-hosted server is unsupported.
-
-**Compose**
-- A single `prefect server start` container runs the API and the background
-  services in one process and needs no Redis *(unverified: inferred from the
-  default in-memory broker; the official compose file splits them and adds
-  Redis)*.
-- Official guide: <https://www.prefect.io/docs/v3/how-to-guides/self-hosted/docker-compose>.
-- Images: `prefecthq/prefect:3.9.2-python3.14`.
-- The worker needs `PREFECT_API_URL=http://<server>:4200/api`. Leave
-  `PREFECT_API_KEY` unset against a self-hosted server, or requests fail
-  with 401.
-- `prefect worker start --pool <name> --type process` creates the pool if it
-  is missing.
-
-**Deployments**
-- `prefect --no-prompt deploy --all` registers what `prefect.yaml` declares.
-- Set the `pull` step explicitly
-  (`prefect.deployments.steps.set_working_directory`). Left out, Prefect
-  records the deploying machine's current directory.
-- A deployment `concurrency_limit` with `CANCEL_NEW` can cancel the next
-  scheduled run, because a slot is taken as soon as a run is pending.
-
-**Inside the flow**
-- Retries: `@task(retries=…, retry_delay_seconds=exponential_backoff(…))`.
-- The two-renders limit: a global concurrency limit
-  (`prefect gcl create <name> --limit 2`) taken with
-  `with concurrency("<name>")`. It is coordinated by the server, so it holds
-  across processes.
-- One run per Slot: `run_deployment(..., idempotency_key=…)`. Flow run names
-  are not unique.
-- Task caching does nothing unless result persistence is on, and the default
-  cache key includes the run id, so it never matches across runs.
-- Prefect gives no guidance on plain dask `.compute()` inside a task. Treat
-  the combination as untested.
-
-**Housekeeping**
-- Self-hosted, flow runs and logs are kept forever unless
-  `PREFECT_SERVER_SERVICES_DB_VACUUM_ENABLED="events,flow_runs"` is set.
-- On Prefect Cloud every log line counts toward a rate limit.
-
-## COG, writing and reading
-
-**Writing (GDAL COG driver; rasterio 1.5.2 bundles GDAL 3.12.2 with WebP)**
-- `TILING_SCHEME=GoogleMapsCompatible` reprojects to Web Mercator and aligns
-  tiles at the chosen zoom. `ZOOM_LEVEL=8`, `BLOCKSIZE=512`.
-- `ALIGNED_LEVELS` sets how many overview levels are aligned to the grid. A
-  whole-world image may align at every level without it *(unverified)*: check
-  with `gdalinfo`.
-- `COMPRESS=WEBP`, `QUALITY=90`. `QUALITY=100` switches to lossless. WebP needs
-  exactly 3 or 4 bands of 8 bits.
-- `ADD_ALPHA` defaults to yes when reprojecting, and WebP stores the alpha
-  inside each tile.
-- `NUM_THREADS` compresses tiles in parallel.
-- `SPARSE_OK` writes empty tiles with a byte count of zero, which readers must
-  handle.
-- JPEG XL cannot be written with the pip wheels, only with a conda-built GDAL.
-
-**Reading in satvis (a later change, in that repository)**
-- Web: Cesium has no COG support. Write a small imagery provider on
-  `@cogeotiff/core` (9 kB gzipped): `getTile(x, y)` returns the tile's bytes
-  and type from one range request. Model the time handling on
-  `src/modules/GibsTimeLayer.ts`, with an hourly step.
-- iOS: the native renderer has no COG reader. It needs a TIFF header parser, a
-  tile source that yields a URL plus a byte range (today
-  `ios/SatvisKit/Sources/SatvisRender/Imagery.swift` yields a URL only), and a
-  fetcher that accepts a 206 answer (today
-  `ios/SatvisKit/Sources/SatvisData/TileFetcher.swift` requires 200). Its time
-  handling is daily-only and must become hourly. iOS decodes WebP from
-  version 14.
-
-## Estimates
-
-None of these is measured. Milestone one replaces them.
-
-- A daytime Slot is about 4 GB of download: the sum of the one-day sizes in
-  the table above.
-- A Mosaic is under 1 GB. A lossless Rendering is about 600 MB.
-- Unpruned output is 25 to 50 GB per day.
-- Encoding a Mosaic in WebP takes about 19 core-minutes.
-- The header a client fetches per Mosaic is under 200 kB with 512 px tiles.
-- Lossy WebP is 25 to 35% smaller than JPEG at the same quality, from
-  natural-photo studies.
+  the first version. The candidates checked and why each fails are in the notes,
+  under "Data sources".

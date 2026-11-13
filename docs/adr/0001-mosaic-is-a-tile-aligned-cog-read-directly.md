@@ -27,9 +27,13 @@ product is one reusable file per Slot and needs no service of its own.
 ## Consequences
 
 - The layout is a contract. A Mosaic whose overviews are not aligned, or whose
-  tiles are not complete images, breaks its readers. Alignment of every overview
-  level is unconfirmed until checked on the first real file.
+  tiles are not complete images, breaks its readers. The encode step checks the
+  alignment of every overview level on each Mosaic and fails if one is off.
 - Transparency lives inside the tiles, never in a separate mask.
 - The bucket must answer cross-origin range requests.
+- A header is good only for the file it was read from. A rebuilt Mosaic
+  replaces its file under the same name, so a client sends `If-Match` with the
+  header's ETag on each tile request and reads the header again on a 412.
 - Zoom 8 is 1.2 times coarser than the finest band directly under each
-  satellite. Renderings keep the full detail.
+  satellite. That detail is given up: the Renderings, which keep it, are
+  working files and are not published.

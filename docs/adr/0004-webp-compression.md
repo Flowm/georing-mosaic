@@ -4,10 +4,10 @@ status: accepted
 
 # Products are compressed as lossy WebP
 
-Mosaics and Renderings are written as lossy WebP at quality 90. Each WebP tile
+Mosaics are written as lossy WebP at quality 90. Each WebP tile
 in a COG is a complete image that every browser and iOS 14 or later decodes
 natively, which is what lets clients read tiles by byte range with no extra
-step (ADR 0001). Compression stays a setting per product.
+step (ADR 0001).
 
 ## Considered Options
 
@@ -18,11 +18,10 @@ step (ADR 0001). Compression stays a setting per product.
   `rasterio` cannot write it, and `geotiff.js` cannot read it. Revisit once
   those change.
 - **AVIF.** Not available as a COG codec in GDAL.
-- **Lossless (WebP, ZSTD).** Four to seven times the size by estimate. Kept as a
-  setting for Renderings when an exact comparison against GeoColor is wanted.
+- **Lossless (WebP, ZSTD).** Four to seven times the size by estimate.
 
 ## Consequences
 
 - Lossy WebP always halves colour resolution, as GDAL's JPEG does, so it cannot
   be made visually lossless.
-- Encoding is slow: by a derived estimate about 19 core-minutes per Mosaic.
+- Encoding a Mosaic takes about a minute on eight cores.

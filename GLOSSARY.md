@@ -33,7 +33,8 @@ when that is meant), GeoColor
 
 **Rendering**:
 A Disk turned into a colour image by the Recipe, in that satellite's own view
-and at its native resolution.
+and at its native resolution. It is a working file: only the Mosaic is
+published.
 _Avoid_: Composite, RGB, disk image
 
 **Mosaic**:
@@ -48,9 +49,14 @@ _Avoid_: Border, overlap, cut line
 ### Reference
 
 **GeoColor**:
-The products of that name from CIRA and EUMETSAT, which the Recipe is tuned
-toward. Never the name of anything produced here.
+CIRA's product of that name, which the Recipe is tuned toward. EUMETSAT's
+product of the same name for Meteosat is satpy's `geo_color` composite and is
+not a reference. Never the name of anything produced here.
 
 **Comparison scene**:
-A fixed place and time at which a Rendering is judged against GeoColor.
+A fixed place and time at which a Rendering is judged against GeoColor. There
+are twenty-one in two sets. The thirteen of the **tuning set** (2026-11-10) are
+what the Recipe is fitted to and looked at. The eight of the **holdout set**
+(2026-09-14, other places) are only measured, never tuned against: they tell
+whether a change holds where it was not made.
 _Avoid_: Test image, sample
