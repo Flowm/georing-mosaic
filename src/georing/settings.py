@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="GEORING_", env_ignore_empty=True)
 
     # Positions that contribute Disks, by their names in georing.satellites.
-    satellite_set: list[str] = ["goes-east", "goes-west", "himawari", "meteosat-0"]
+    satellite_set: list[str] = ["goes-east", "goes-west", "himawari", "meteosat-0", "meteosat-iodc"]
     # Where products and the catalogue go: a directory, or s3://bucket/prefix.
     output_url: str = "out"
     # For a bucket only. The endpoint is for a service other than AWS, such as

@@ -16,7 +16,7 @@ from georing.settings import settings
 from georing.step import StepFailed
 
 SLOT = datetime(2026, 11, 10, 18, tzinfo=UTC)
-ALL = ["goes-east", "goes-west", "himawari", "meteosat-0"]
+ALL = ["goes-east", "goes-west", "himawari", "meteosat-0", "meteosat-iodc"]
 DEPLOYMENT = "76ba58a1-aadc-46f3-a9ba-7682e7a94864"
 
 
@@ -84,7 +84,7 @@ def test_a_missing_disk_is_left_out_and_recorded(steps, tmp_path):
     steps["unavailable"] = {"meteosat-0"}
     result = flow.build_slot(SLOT)
 
-    assert result["disks"] == ["goes-east", "goes-west", "himawari"]
+    assert result["disks"] == ["goes-east", "goes-west", "himawari", "meteosat-iodc"]
     item = json.loads((tmp_path / "out/mosaic/2026/11/10/georing_mosaic_20261110T1800Z.json").read_text())
     assert item["properties"]["georing:missing_disks"] == ["meteosat-0"]
     assert "render meteosat-0" not in steps["steps"]
@@ -106,7 +106,7 @@ def test_a_disk_that_arrives_late_does_not_hold_up_the_others(steps, monkeypatch
     result = flow.build_slot(SLOT)
 
     renders = [s for s in steps["steps"] if s.startswith("render")]
-    assert renders[-1] == "render goes-east" and len(renders) == 4
+    assert renders[-1] == "render goes-east" and len(renders) == len(ALL)
     assert result["disks"] == ALL
 
 
@@ -130,7 +130,7 @@ def test_a_rebuild_that_adds_no_disk_leaves_the_mosaic_as_it_is(steps, tmp_path)
 
     result = flow.build_slot(SLOT)       # Meteosat is still not there
 
-    assert result["built"] is False and result["disks"] == ["goes-east", "goes-west", "himawari"]
+    assert result["built"] is False and result["disks"] == ["goes-east", "goes-west", "himawari", "meteosat-iodc"]
     assert "mosaic join" not in steps["steps"]
 
 def test_a_slot_with_no_disk_at_all_fails(steps):
@@ -148,7 +148,7 @@ def test_a_disk_that_cannot_be_rendered_does_not_cost_the_slot(steps, monkeypatc
         return original(step, *args, **kwargs)
 
     monkeypatch.setattr(flow, "run_step", run_step)
-    assert flow.build_slot(SLOT)["disks"] == ["goes-east", "goes-west", "meteosat-0"]
+    assert flow.build_slot(SLOT)["disks"] == ["goes-east", "goes-west", "meteosat-0", "meteosat-iodc"]
 
 
 @pytest.fixture
@@ -384,7 +384,7 @@ def test_the_run_of_the_hour_queues_slots_that_lack_a_disk_or_were_never_built(s
     assert rebuilds == {
         at(17).isoformat(): "rebuild-20261110T1700Z-himawari",
         # 16:00 has no Mosaic, and an older one exists: its run failed.
-        at(16).isoformat(): "rebuild-20261110T1600Z-goes-east+goes-west+himawari+meteosat-0",
+        at(16).isoformat(): "rebuild-20261110T1600Z-goes-east+goes-west+himawari+meteosat-0+meteosat-iodc",
     }                                                            # nothing before 15:00, the oldest Mosaic
     assert {c["work_queue_name"] for c in queued} == {"catch-up"}
     assert {c["as_subflow"] for c in queued} == {False}  # cancelling this run leaves them queued

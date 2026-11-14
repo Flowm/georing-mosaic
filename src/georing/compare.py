@@ -6,8 +6,8 @@
 
 For each scene this renders the scene's corner of its Disk and fetches CIRA's
 GeoColor of the same scan from SLIDER. Both are in the satellite's own view,
-on SLIDER's 1 km pixels, and are written side by side: ours on the left, the
-reference on the right.
+on SLIDER's finest pixels (1 km, or 3 km for Meteosat-9), and are written side
+by side: ours on the left, the reference on the right.
 
 The scenes come in two sets. The Recipe is fitted to and looked at on the
 tuning set; the holdout set, on another day and at other places, only tells
@@ -29,15 +29,26 @@ from pathlib import Path
 import numpy as np
 
 SLIDER = "https://slider.cira.colostate.edu/data"
-# position -> (SLIDER's name for the satellite, its tile size in pixels).
-# SLIDER cuts each full disk into 16 by 16 tiles at its finest level, 1 km.
+
+
+@dataclass(frozen=True)
+class SliderDisk:
+    """How SLIDER tiles one satellite's full disk at its finest level."""
+
+    name: str  # SLIDER's name for the satellite
+    tile: int  # tile size in pixels
+    level: int = 4  # the finest zoom level: 1 km, or 3 km for SEVIRI
+    tiles_across: int = 16
+    disk_pixels: int = 2  # the Disk's finest pixels across one of SLIDER's
+
+
 SLIDER_DISKS = {
-    "goes-east": ("goes-19", 678),
-    "goes-west": ("goes-18", 678),
-    "meteosat-0": ("meteosat-12", 696),
-    "himawari": ("himawari", 688),
+    "goes-east": SliderDisk("goes-19", 678),
+    "goes-west": SliderDisk("goes-18", 678),
+    "meteosat-0": SliderDisk("meteosat-12", 696),
+    "himawari": SliderDisk("himawari", 688),
+    "meteosat-iodc": SliderDisk("meteosat-9", 464, level=3, tiles_across=8, disk_pixels=1),
 }
-TILES_ACROSS = 16
 
 
 @dataclass(frozen=True)
@@ -86,6 +97,14 @@ COMPARISON_SCENES = (
                     "thunderstorms over the Congo basin at midnight"),
     ComparisonScene("storms-east", "meteosat-0", _slot(10, 18), (28, -12, 42, 2),
                     "thunderstorms over Tanzania and Lake Victoria by night"),
+    ComparisonScene("day-seviri", "meteosat-iodc", _slot(10, 6), (68, 8, 84, 26),
+                    "India before noon: the made-up blue and green over land"),
+    ComparisonScene("snow-seviri", "meteosat-iodc", _slot(10, 6), (70, 30, 84, 38),
+                    "the Karakoram, the Himalaya and Tibet in November"),
+    ComparisonScene("dusk-seviri", "meteosat-iodc", _slot(10, 13), (60, 0, 80, 22),
+                    "dusk over the Arabian Sea and southern India"),
+    ComparisonScene("night-seviri", "meteosat-iodc", _slot(10, 18), (68, 8, 84, 26),
+                    "India at midnight: city lights, low and high cloud"),
     # The holdout set: another day, other places.
     ComparisonScene("h-day-ahi", "himawari", _slot(14, 3, 9), (108, -9, 125, 6),
                     "Borneo, Java and Sulawesi before noon", "holdout"),
@@ -103,6 +122,11 @@ COMPARISON_SCENES = (
                     "snow on the Andes at the end of winter", "holdout"),
     ComparisonScene("h-glint", "himawari", _slot(14, 22, 9), (162, -4, 179, 12),
                     "the sun's reflection on the central Pacific", "holdout"),
+    # SLIDER no longer held Meteosat-9 for 14 September when it was added.
+    ComparisonScene("h-day-seviri", "meteosat-iodc", _slot(1, 7, 10), (44, 14, 59, 28),
+                    "Arabia and Oman before noon: desert and the Arabian Sea", "holdout"),
+    ComparisonScene("h-night-seviri", "meteosat-iodc", _slot(1, 20, 10), (84, 4, 98, 22),
+                    "the Bay of Bengal, Bangladesh and Myanmar at night", "holdout"),
 )
 
 
@@ -135,11 +159,13 @@ def window(scene: ComparisonScene, disk_area) -> Window:
     # FCI's extent lists its top edge before its bottom one.
     x0, y0, x1, y1 = disk_area.area_extent
     left, right, top = min(x0, x1), max(x0, x1), max(y0, y1)
-    # SLIDER's pixels are 1 km, two of the Disk's finest. Where its tiles
-    # cover more than the Disk (Himawari: 11008 px for 11000), the Disk sits
-    # in their middle.
-    metres = (right - left) / (disk_area.width // 2)
-    margin = (SLIDER_DISKS[scene.position][1] * TILES_ACROSS - disk_area.width // 2) / 2 * metres
+    # SLIDER's pixels are 1 km, two of the Disk's finest, or for SEVIRI 3 km,
+    # one. Where its tiles cover more than the Disk (Himawari: 11008 px for
+    # 11000), the Disk sits in their middle.
+    slider = SLIDER_DISKS[scene.position]
+    across = disk_area.width // slider.disk_pixels
+    metres = (right - left) / across
+    margin = (slider.tile * slider.tiles_across - across) / 2 * metres
     left, top = left - margin, top + margin
     west, south, east, north = scene.bbox
     lon = np.concatenate([np.linspace(west, east, 50)] * 2 + [np.full(50, west), np.full(50, east)])
@@ -168,7 +194,8 @@ def reference(scene: ComparisonScene, win: Window, cache: Path) -> np.ndarray:
 
     path = cache / f"{scene.name}.png"
     if not path.exists():
-        name, tile = SLIDER_DISKS[scene.position]
+        slider = SLIDER_DISKS[scene.position]
+        name, tile = slider.name, slider.tile
         scans = json.loads(_get(
             f"{SLIDER}/json/{name}/full_disk/geocolor/{scene.slot:%Y%m%d}_by_hour.json"
         ))["timestamps_int"].get(f"{scene.slot:%H}", [])
@@ -182,7 +209,7 @@ def reference(scene: ComparisonScene, win: Window, cache: Path) -> np.ndarray:
 
         def fetch(row_col: tuple[int, int]) -> np.ndarray:
             url = (f"{SLIDER}/imagery/{scene.slot:%Y/%m/%d}/{name}---full_disk/geocolor/"
-                   f"{stamps[0]}/04/{row_col[0]:03d}_{row_col[1]:03d}.png")
+                   f"{stamps[0]}/{slider.level:02d}/{row_col[0]:03d}_{row_col[1]:03d}.png")
             with MemoryFile(_get(url)) as memory, memory.open() as src:
                 return src.read()[:3]
 
@@ -223,7 +250,7 @@ def ours(scene: ComparisonScene, recipe: str, work: Path, secrets: dict[str, str
     with rasterio.open(tif) as src:
         pixels, transform, crs = src.read()[:3], src.transform, src.crs
     tif.unlink()
-    # The Rendering is twice as fine as SLIDER's grid, so average it down.
+    # The Rendering is finer than SLIDER's grid, or as fine, so average it down.
     out = np.zeros((3, win.height, win.width), dtype=np.uint8)
     reproject(pixels, out, src_transform=transform, src_crs=crs, dst_transform=win.transform,
               dst_crs=crs, resampling=Resampling.average)

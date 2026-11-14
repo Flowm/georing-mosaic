@@ -1,0 +1,43 @@
+sensor_name: visir/seviri
+
+composites:
+  # SEVIRI has no blue or green band. Its day colour is looked up in a table
+  # of the colour MTG-I1 shows, before the enhancement, for each combination
+  # of SEVIRI's three day bands, so that Meteosat-9 meets MTG-I1 at a Seam in
+  # one colour and takes FCI's tone curves. georing-fit-colour made the table
+  # from where both satellites see the ground within 65 degrees of vertical
+  # and the sun is within 70 degrees of overhead, on 2026-11-10 at 07:00,
+  # 09:00 and 11:00 and 2026-09-20 at 09:00 and 11:00 UTC (the green Sahel);
+  # 2026-11-10 13:00 was only measured.
+  georing_day:
+    compositor: !!python/name:georing.recipe.ColourTable
+    standard_name: georing_day
+    filename: seviri_colour.npz
+    prerequisites:
+      - name: VIS006
+        modifiers: [georing_sunz, georing_rayleigh]
+      - name: VIS008
+        modifiers: [georing_sunz]
+      - name: IR_016
+        modifiers: [georing_sunz]
+
+  # Low cloud by night, as in visir.yaml but with the ramp moved up. SEVIRI's
+  # 10.8 - 3.9 um difference runs higher than FCI's over the same clear ground
+  # at the same time: by 2.6 K over land and 3.3 K over sea (medians where
+  # both satellites see the ground within 65 degrees of vertical and FCI's
+  # 10.5 um reads 285-295 K, 2026-11-10 00:00 UTC). Unmoved, it painted clear
+  # ground as fog.
+  georing_low_clouds:
+    compositor: !!python/name:satpy.composites.mask.LowCloudCompositor
+    standard_name: geo_color_low_clouds
+    values_water: 0
+    values_land: 100
+    range_land: [2.6, 6.6]
+    range_water: [3.3, 7.3]
+    prerequisites:
+      - compositor: !!python/name:satpy.composites.arithmetic.DifferenceCompositor
+        prerequisites:
+          - {wavelength: 10.4, calibration: brightness_temperature}
+          - {wavelength: 3.9, calibration: brightness_temperature}
+      - {wavelength: 10.4, calibration: brightness_temperature}
+      - georing_land_water_mask

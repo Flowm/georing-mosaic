@@ -28,6 +28,7 @@ georing-slot = "georing.cli:slot_main"
 georing-backfill = "georing.cli:backfill_main"
 georing-compare = "georing.compare:main"
 georing-static = "georing.static:main"
+georing-fit-colour = "georing.fit:main"
 
 [build-system]
 requires = ["uv_build>=0.12,<0.13"]

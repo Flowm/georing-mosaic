@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -135,8 +136,7 @@ def _eumetsat_entries(sat: Satellite, slot: datetime) -> list[tuple]:
         if len(products) != 1:
             raise DiskMissing(f"{sat.position}: {len(products)} products in {collection_id}")
         product = products[0]
-        # The trailer chunk is left out: satpy's reader has no use for it.
-        jobs += [(product, e) for e in product.entries if "-BODY-" in e and e.endswith(".nc")]
+        jobs += [(product, e) for e in product.entries if re.search(sat.entries, e)]
     return jobs
 
 
