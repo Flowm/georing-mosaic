@@ -219,19 +219,19 @@ now.
 | night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 3, 3, 3 |
 | dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 11, 11, 12 |
 | glint-ahi | tuning | Himawari, 02:00 | around New Guinea | 7, 8, 9 | 3, 4, 6 | 3, 4, 5 |
-| storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 6, 6, 8 |
-| storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 5, 5, 5 |
+| storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 4, 4, 7 |
+| storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 3, 3, 4 |
 | h-day-ahi | holdout | Himawari, 03:00 | Borneo, Java and Sulawesi | 8, 10, 10 | 3, 7, 8 | 2, 6, 7 |
 | h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 2, 4, 8 |
 | h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 5, 6, 6 |
-| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 4, 3, 3 |
+| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 4, 4, 4 |
 | h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 12, 16, 18 |
 | h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 6, 6, 8 |
 | h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 3, 7, 4 |
 | h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 6, 9, 10 |
 | day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 28, 24, 15 |
 | snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 29, 22, 18 |
-| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 12, 16 |
+| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 12, 15 |
 | night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 22, 26 |
 | h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 19, 11, 18 |
 | h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 6 |
@@ -242,7 +242,14 @@ so those two columns are empty for them. Its holdout scenes are on
 2026-10-01: SLIDER no longer held Meteosat-9 for 14 September on 2026-11-14.
 The dust and day-fci scenes are at 11:00 because SLIDER has no Meteosat image
 for 12:00 on 2026-11-10. The storm scenes were added during the tuning; before the cloud
-layer's ramp was changed, they were 17.5, 18.1, 17.4 and 12.7, 12.9, 12.2.
+layer's ramp was changed, they were 17.5, 18.1, 17.4 and 12.7, 12.9, 12.2,
+and before it was fitted to CIRA's storm tops on 2026-11-14 (see the
+infrared cloud layer below), 6.2, 6.0, 8.0 and 4.8, 4.8, 4.9.
+On our side of each pair a frame 3 to 7 px wide is black, where the
+Rendering, cropped to the scene's bounds, stops short of SLIDER's rectangle
+around them (seen on the storm scenes, 2026-11-14). It adds 1 to 2 levels to
+every figure; without it storms is 2.6, 1.9, 5.3 and storms-east 1.8, 1.6,
+2.1.
 Over the water of the Great Bahama Bank (79.5–77.5°W, 23–25.5°N) the day
 scene's mean colour is 44, 84, 105 against CIRA's 43, 90, 107; before tuning
 it was 44, 81, 106.
@@ -285,13 +292,25 @@ What the Recipe changes from `geo_color`:
   (`georing_high_clouds`): CIRA draws it white (Miller et al. 2020, Eq. 8),
   `geo_color` greys it by temperature too, which left cold clear ground and
   low cloud dark. This is what makes cold ground lighter by night. The
-  opacity ramps linearly from 296 K down to 185 K in the tropics and 205 K
-  poleward of 60° (satpy's ramp ends at 210/230 K), read off the night pixels
-  of the night, night-warm, storms and storms-east scenes. Over storm tops
-  CIRA is brighter the colder the top, by about 1.6 levels per kelvin all the
-  way to 185 K (195 at 205 K, 227 at 185 K). So only the coldest tops are
-  opaque and deep convection keeps its shading; with satpy's ramp everything
-  below 210 K was flat white.
+  layer is level 250, not 255, and its opacity ramps from 296 K down to
+  178 K in the tropics and 198 K poleward of 60°, with a gamma of 0.95
+  (satpy's ramp ends at 210/230 K). Over storm tops CIRA is brighter the
+  colder the top, by about 1.6 levels per kelvin down to 184 K at least, the
+  coldest the scenes hold (205 at 200 K, 230 at 184 K), and never flat white.
+  A first ramp, linear and opaque at 185 K, was read off the night, night-warm
+  and storm scenes; it made every top colder than about 260 K too bright,
+  from 5 levels at 236 K to 20 at 184 K, and burned overshooting tops to flat
+  white. The level, ramp and gamma were then fitted on 2026-11-14 to CIRA's
+  pixels on the two storm scenes, each paired with its 10.4 µm temperature:
+  fitted on either scene alone, the other one's cloud (below 280 K) came
+  from 5.4 to 3.2 and from 5.0 to 2.2 levels. Rendered, the median per 8 K of
+  temperature is now within 3 levels of CIRA's from 184 to 296 K. On the
+  warm-ground scenes (night-warm, h-night-warm, both SEVIRI night scenes)
+  it costs 0.2 to 0.3, which the fit put on the gamma: a linear ramp
+  opaque at 180 K cost them nothing in the fit but left the coldest tops
+  about 11 levels too bright. Of the scenes measured, only night reaches
+  poleward of 30°, and its coldest top there is 233 K; the 198 K poleward is
+  the old 205 K moved by the same 7 K, not measured.
 - **The low-cloud layer starts at 0 K over land on every sensor**
   (`georing_low_clouds`). `geo_color` starts it at 1.5 K for FCI. Dry ground
   emits less at 3.9 µm, so CIRA tints it bluish-lilac by night; the Recipe now
@@ -302,9 +321,6 @@ What the Recipe changes from `geo_color`:
   brightness, once its infrared layer is taken off.
 
 What still differs from CIRA:
-- **Thick cold cloud by night** keeps its shading, but its coldest cores
-  are a little brighter than CIRA's (storms: 8 levels in blue): ours are
-  white, 255, from 185 K down, where CIRA's reach about 227.
 - **The terminator.** Tuning dusk 12.3, dawn 12.1, holdout dawn 18.1 (blue
   worst). On the tuning scenes ours is too bright at sun angles near 74° at
   dawn, too dark near 82°, and short of blue over clear sea at 66–72° at dusk.
