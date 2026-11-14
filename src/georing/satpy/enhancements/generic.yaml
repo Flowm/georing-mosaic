@@ -79,7 +79,7 @@ enhancements:
     operations:
       - name: white
         method: !!python/name:georing.recipe.uniform_luminance
-        kwargs: {level: 255}
+        kwargs: {level: 250}
 
   georing:
     standard_name: georing

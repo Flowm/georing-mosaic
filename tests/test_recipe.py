@@ -60,7 +60,7 @@ def test_only_the_coldest_cloud_tops_are_opaque_so_storms_keep_their_shading():
     layer = yaml.safe_load(text)["composites"]["georing_high_clouds"]
     kwargs = {k: layer[k] for k in ("transition_min_limits", "transition_max", "transition_gamma")}
     area = AreaDefinition("equator", "", "", "EPSG:4326", 4, 1, (0, -0.5, 4, 0.5))
-    bt = xr.DataArray(da.from_array(np.array([[300.0, 250.0, 200.0, 180.0]]), chunks=(1, 4)), dims=("y", "x"),
+    bt = xr.DataArray(da.from_array(np.array([[300.0, 250.0, 200.0, 175.0]]), chunks=(1, 4)), dims=("y", "x"),
                       coords={"y": [0.0], "x": [0.5, 1.5, 2.5, 3.5]},
                       attrs={"area": area})
     alpha = HighCloudCompositor("high", **kwargs)([bt]).sel(bands="A").values[0]

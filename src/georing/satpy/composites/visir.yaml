@@ -53,20 +53,22 @@ composites:
       - georing_high_clouds
       - georing_night_ground
 
-  # The infrared window band as a white sheet whose opacity follows the
-  # cloud-top temperature. CIRA draws it white (Miller et al. 2020, Eq. 8);
-  # satpy's geo_color greys it by temperature as well, which leaves cold clear
-  # ground and low cloud dark. The opacity ramps from 296 K to 185 K in the
-  # tropics and 205 K poleward of 60 degrees: only the coldest tops are
-  # opaque, so deep convection keeps its shading. satpy's ramp ends at
-  # 210/230 K and turned such cloud into a flat white. The ramp was read off
-  # the night pixels of the tuning scenes, storms among them.
+  # The infrared window band as a near-white sheet (level 250, see the
+  # enhancement) whose opacity follows the cloud-top temperature. CIRA draws
+  # it white (Miller et al. 2020, Eq. 8); satpy's geo_color greys it by
+  # temperature as well, which leaves cold clear ground and low cloud dark.
+  # The opacity ramps from 296 K to 178 K in the tropics and 198 K poleward
+  # of 60 degrees, with a gamma of 0.95: no storm top is flat white, as none
+  # is in CIRA's, which brightens by about 1.6 levels per kelvin down to
+  # 184 K at least. satpy's ramp ends at 210/230 K and turned such cloud into
+  # a flat white. The level, ramp and gamma were fitted to CIRA's pixels on
+  # the storm scenes, each scene checked with the fit to the other.
   georing_high_clouds:
     compositor: !!python/name:satpy.composites.mask.HighCloudCompositor
     standard_name: georing_high_clouds
-    transition_min_limits: [185, 205]
+    transition_min_limits: [178, 198]
     transition_max: 296
-    transition_gamma: 1.0
+    transition_gamma: 0.95
     prerequisites:
       - wavelength: 10.4
 
