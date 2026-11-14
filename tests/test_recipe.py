@@ -67,3 +67,28 @@ def test_only_the_coldest_cloud_tops_are_opaque_so_storms_keep_their_shading():
     assert alpha[0] == 0 and alpha[-1] == 1
     # Tops at 200 K, a deep storm's, are still partly see-through.
     assert 0.5 < alpha[2] < 1
+
+
+def test_a_colour_table_is_read_between_its_bins_and_held_at_its_ends():
+    from georing.recipe import colour_from_table
+
+    centres = np.array([[0.0, 10.0]] * 3)
+    # Red follows the first band, green the second; blue is 5 everywhere.
+    table = np.zeros((3, 2, 2, 2))
+    table[0, 1], table[1, :, 1], table[2] = 10, 10, 5
+    bands = np.array([[[2.5, 30, np.nan]], [[7.5, 5, 1]], [[0, 0, 1]]], dtype=np.float32)
+    out = colour_from_table(bands, centres, table)
+    np.testing.assert_allclose(out[:, 0, :2], [[2.5, 10], [7.5, 5], [5, 5]], atol=1e-5)
+    assert np.isnan(out[:, 0, 2]).all()  # missing in one band, missing in all
+
+
+def test_the_seviri_table_is_whole_and_makes_bright_cloud_white():
+    from pathlib import Path
+
+    from georing.recipe import colour_from_table
+
+    with np.load(Path(__file__).parents[1] / "src/georing/satpy/seviri_colour.npz") as f:
+        centres, table = f["centres"], f["table"]
+    assert centres.shape == (3, table.shape[1]) and np.isfinite(table).all()
+    cloud = colour_from_table(np.array([[[85.0]], [[85.0]], [[40.0]]]), centres, table)[:, 0, 0]
+    assert np.ptp(cloud) < 0.1 * cloud.mean()

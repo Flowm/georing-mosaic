@@ -20,7 +20,7 @@ from pathlib import Path
 
 from georing.static import static_env
 
-# A Slot's downloads, the unpacked Himawari segments, four lossless renders
+# A Slot's downloads, the unpacked Himawari segments, five lossless renders
 # and the lossless Mosaic share the scratch disk.
 SCRATCH_NEEDED_GB = 40
 # Credentials a step does not inherit. It has one only when it is handed it,

@@ -139,7 +139,7 @@ class Catalogue:
             "type": "Collection",
             "stac_version": STAC_VERSION,
             "id": "mosaic",
-            "description": "The four satellites' views of one Slot joined on one global grid: "
+            "description": "The satellites' views of one Slot joined on one global grid: "
                            "Web Mercator, 611 m per pixel.",
             "license": "other",
             "extent": {

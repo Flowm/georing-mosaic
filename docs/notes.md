@@ -5,7 +5,8 @@ satpy, Prefect and the COG driver behave, and what a Slot costs. The decisions
 that rest on these are in [plan.md](plan.md); this file is the evidence.
 
 Facts were looked up on 2026-11-10 to 2026-11-12 from primary sources or live
-probes. Terms in capitals are defined in
+probes, those on Meteosat-9 and the other satellites considered on
+2026-11-14. Terms in capitals are defined in
 `GLOSSARY.md`.
 
 ## Data sources
@@ -16,6 +17,7 @@ probes. Terms in capitals are defined in
 | GOES-West | GOES-18 | 137°W | `s3://noaa-goes18/ABI-L1b-RadF/` | 662 / 279 MB | 10–110 s | none |
 | Himawari | Himawari-9 | 140.7°E | `s3://noaa-himawari9/AHI-L1b-FLDK/` | 652 / 271 MB | 0.5–4.5 min | none |
 | Meteosat 0° | MTG-I1 | 0° | EUMETSAT Data Store, `EO:EUM:DAT:0662` and `EO:EUM:DAT:0665` | 1.03 / 0.47 GB and 1.04 / 0.56 GB | about 4.5 min | key and secret |
+| Meteosat IODC | Meteosat-9 (MSG-2) | 45.5°E | EUMETSAT Data Store, `EO:EUM:DAT:MSG:HRSEVIRI-IODC` | 0.26 GB, day or night | about 40 s | key and secret |
 
 The sizes are from one day (2026-11-10), for the bands listed below. All three
 buckets are in `us-east-1` and allow anonymous access.
@@ -51,6 +53,19 @@ buckets are in `us-east-1` and allow anonymous access.
 - Rate limits exist (the client handles HTTP 429) but are not published. Four
   downloads at once fetched a scan in 67 to 78 s without a refusal.
 
+**Meteosat IODC (SEVIRI)**
+- One native-format file (`.nat`) per scan holds all twelve channels, so
+  there is no per-band download. The product also lists `manifest.xml` and
+  `EOPMetadata.xml`, which are not needed.
+- Scans start every 15 minutes. The one on the hour senses from 10 seconds
+  past to 12 minutes 40 past and is published about 40 seconds later.
+- Channels: VIS006, VIS008 and IR_016 by day, IR_039 and IR_108 by night, at
+  3 km; HRV at 1 km over part of the disk. There is no blue or green band.
+- The spacecraft is in an inclined orbit: on 2026-11-10 at 06:00 it was 7.1°N
+  of the equator, at 46.1°E. Level 1.5 data is on the nominal 45.5°E grid.
+- The Data Store's other SEVIRI collection, `EO:EUM:DAT:MSG:HRSEVIRI`, is
+  Meteosat-10 at 0°, on the same 15-minute cycle.
+
 **Arrival times**
 
 Measured over 720 hourly Slots, 2026-10-11 to 2026-11-10: minutes past the
@@ -66,6 +81,7 @@ attempted.
 | GOES-West | 10.9 | 11.6 | 1 |
 | Himawari | 13.9 | 16.8 | 2 |
 | Meteosat, both collections | 14.2 | 31.3 | 1 |
+| Meteosat-9 | 13.3 | 14.7 | 0 |
 
 - All four were complete by 15 past in 85% of Slots, by 20 past in 90%, by
   30 past in 93% and by 45 past in 98.5%.
@@ -76,23 +92,70 @@ attempted.
   product already downloadable near 14 past is unknown: `updated` keeps only
   the latest value. See "Open items" in the plan.
 - Rare long delays exist: two Meteosat Slots many hours late, one Himawari
-  Slot at 101 minutes past.
+  Slot at 101 minutes past, one Meteosat-9 Slot at 997 minutes past.
+- Meteosat-9 was measured the same way over the same 720 Slots, from the
+  search API's `updated` time: complete by 15 past in 99.0% of Slots. It
+  does not move the joint figures, which Meteosat at 0° sets.
 - Wherever a satellite had no on-the-hour scan, its scan at 10 past existed.
 
 **Licences and attribution**
 - GOES: open; NOAA asks for attribution and no implied endorsement.
 - Himawari: JMA data distributed by NOAA; both ask for attribution.
 - Meteosat: see ADR 0002. Images made from the data are our own; the required
-  line is "[Contains modified] EUMETSAT Meteosat data [year]".
+  line is "[Contains modified] EUMETSAT Meteosat data [year]". The policy's
+  Article 4 lists "All Level 1 Hourly SEVIRI, FCI and IRS data" as Core data,
+  free under CC-BY-4.0 (Article 5); it makes no exception for the Indian Ocean
+  service. "Hourly Data" are "those nominal full disk repeat cycles of data
+  referenced by EUMETSAT in time to each clock hour (UTC)".
 
-**Satellites considered for the India seam, and rejected**
-- Meteosat-9 at 45.5°E: its instrument has no blue or green band.
+**Where the four satellites leave gaps**
+
+With the 85° limb limit, on a grid of 0.25° between 85°S and 85°N:
+- 4.3% of the Earth's area is seen by none of the four, 4.0% of it poleward
+  of 60°: no geostationary satellite sees any longitude poleward of 76.5°.
+- 14.6% is seen at more than 75° from vertical. At 70°E the steepest view is
+  78.5° at the equator, 81.4° at 30°N and 84.7° at 45°N, and nothing sees
+  40–110°E north of 45.75°N.
+- Any one satellite between 45 and 87°E brings the area seen at more than 75°
+  down to about 9.4% and the gap at 40–110°E up to 70–73°N. GK2A at 128.2°E
+  brings it to 11.8% and 57.5°N.
+- Meteosat-9 takes, by view angle alone, 23–93°E, 19% of the Earth; where it
+  sees finer (ADR 0005), 63.5–75°E at the equator and 61.5–76.5°E at 45°N,
+  4.1% of the Earth.
+
+**Satellites considered for the India seam**
+- Meteosat-9 at 45.5°E: its instrument has no blue or green band and its
+  pixels are 3 km. Taken in on 2026-11-14, with its colour looked up from
+  MTG-I1's (ADR 0005; "SEVIRI" under "satpy").
 - GK2A at 128.2°E (`s3://noaa-gk2a-pds`): open, with real colour bands, but
   too far east to help, 12 to 14 minutes slower, and satpy has no `geo_color`
   for it.
 - FY-4B at 105°E: data needs a real-name account with order-based pickup, and
   WMO's registry says its imager failed on 30 July 2026.
 - INSAT and Electro-L: no open download found.
+
+**Geostationary data on AWS Open Data** (the registry's 1,501 datasets,
+2026-11-14)
+- Raw scans: `noaa-goes16` to `noaa-goes19`, `noaa-himawari8` and
+  `noaa-himawari9`, and `noaa-gk2a-pds`. Only GOES-18, GOES-19, Himawari-9 and
+  GK2A are current: GOES-16 stopped on 2025-04-07, GOES-17 on 2023-01-10 and
+  Himawari-8, the backup, last wrote on 2025-11-26.
+- GK2A: all sixteen bands, blue and green among them, one NetCDF file per band
+  under `AMI/L1B/FD/YYYYMM/DD/HH/`, every 10 minutes. The 02:00 scan of
+  2026-11-14 was complete about 30 minutes past.
+- `noaa-gmgsi-pds` is NOAA's own hourly global mosaic, in greyscale only
+  (visible, two infrared, water vapour), 7.5 MB for the visible. It is the
+  only dataset there with Meteosat-9.
+- No Meteosat, FY-4, INSAT or Electro-L scans are on AWS.
+
+**Polar orbiters, for the polar caps** (not used)
+- VIIRS on NOAA-20 and NOAA-21 is in `noaa-nesdis-n20-pds` and
+  `noaa-nesdis-n21-pds`, one file per band per 85-second granule
+  (`VIIRS-M3-SDR/`, `VIIRS-I1-SDR/` and so on). On 2026-11-14 granules
+  arrived 13 to 57 minutes after sensing, 26 to 30 at the median.
+  `noaa-nesdis-snpp-pds` held nothing for that day.
+- A pass is not a Slot: using one means imagery from up to about 50 minutes
+  either side of the hour.
 
 Sources:
 [AWS GOES](https://registry.opendata.aws/noaa-goes/),
@@ -166,10 +229,19 @@ now.
 | h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 6, 6, 8 |
 | h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 3, 7, 4 |
 | h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 6, 9, 10 |
+| day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 28, 24, 15 |
+| snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 29, 22, 18 |
+| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 12, 16 |
+| night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 22, 26 |
+| h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 19, 11, 18 |
+| h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 6 |
 
-Exact figures are in `difference.json` beside the images. The dust and day-fci
-scenes are at 11:00 because SLIDER has no Meteosat image for 12:00 on
-2026-11-10. The storm scenes were added during the tuning; before the cloud
+Exact figures are in `difference.json` beside the images. satpy has no
+`geo_color` for SEVIRI, and Meteosat-9's scenes were added after the tuning,
+so those two columns are empty for them. Its holdout scenes are on
+2026-10-01: SLIDER no longer held Meteosat-9 for 14 September on 2026-11-14.
+The dust and day-fci scenes are at 11:00 because SLIDER has no Meteosat image
+for 12:00 on 2026-11-10. The storm scenes were added during the tuning; before the cloud
 layer's ramp was changed, they were 17.5, 18.1, 17.4 and 12.7, 12.9, 12.2.
 Over the water of the Great Bahama Bank (79.5–77.5°W, 23–25.5°N) the day
 scene's mean colour is 44, 84, 105 against CIRA's 43, 90, 107; before tuning
@@ -252,6 +324,65 @@ What still differs from CIRA:
 - **Snow on Himawari** (tuning 12.2): dry ground is too blue, and high cloud
   is greyer than CIRA's since the cloud-top step was taken out.
 
+**SEVIRI**
+
+satpy reads Meteosat-9 with `seviri_l1b_native` and has no `true_color` or
+`geo_color` for SEVIRI. Like FCI's, its grid is stored south first and east
+first; the GeoTIFF's pixel width is negative and GDAL warps it right. The
+render takes 5 s on eight cores and peaks at 1.5 GB.
+
+The day colour is a table, `src/georing/satpy/seviri_colour.npz`, made with
+
+    georing-fit-colour 2026-11-10T07 2026-11-10T09 2026-11-10T11 \
+        2026-09-20T09 2026-09-20T11 --check 2026-11-10T13
+
+For each Slot it puts MTG-I1's day colour before its enhancement (red, the
+Recipe's green and blue, Rayleigh-corrected) and SEVIRI's VIS006
+(Rayleigh-corrected), VIS008 and IR_016 on one grid of 0.05° over 15°W–60°E,
+55°S–55°N, averaging each satellite's pixels into each cell. It keeps cells
+both satellites see within 65° of vertical, with the sun within 70° of
+overhead, whose 3 by 3 neighbourhood varies by less than 1.5% reflectance or
+10% of its own, in both. That leaves 1.9 million cells from the five Slots.
+The table has 24 bins per band, in equal steps of the square root of the
+reflectance from 0 to 110%; a bin with 10 cells or more holds their median
+MTG-I1 colour, the rest a cubic polynomial of the three bands fitted on all
+cells. Weighted so that each 2% of SEVIRI's red counts alike, it misses
+MTG-I1 by 2.6, 2.6 and 2.6% reflectance (red, green, blue) on the cells it was
+made from and by 4.5, 4.3 and 4.1% on 13:00. Clear sea and vegetation are
+within 1% at the median; cloud, which the two see from two sides, is within
+5%; bright desert is 3% too dark in red.
+
+What was tried on the way:
+- **A cubic polynomial alone** misses 13:00 by 4.8, 4.4 and 4.4%, but at the
+  median turned dense forest (NDVI over 0.6) teal, blue 5.0 against MTG-I1's
+  3.5, and lush crops red: SEVIRI's 8, 31, 17% over central India gave
+  8.1, 5.8, 2.4. The table gives 3.9, 4.7, 2.4 for forest and 7.6, 7.2, 4.2
+  for those crops, against MTG-I1's 6.7, 8.2, 5.5 where it sees the like.
+- **The November Slots alone** hold only 43 cells near those crops; the
+  September Slots, with the Sahel green after the rains, were added for them.
+- **Weighting by SEVIRI's red alone** puts dark sea and dense forest, which
+  share a red, in one class, and sea is far more common; a polynomial then
+  bends toward the sea. Weighting by red and 0.8 µm together helped forest
+  but not sea; the table needs neither.
+- **An evenness limit of 1.5% alone**, without the 10% share, kept almost no
+  cloud: MTG-I1's blue then never rose above about 20%.
+
+Against Himawari's real colour over north India at 06:00 on 2026-11-10 (both
+Renderings warped to 0.02°), Meteosat-9's forest and crops are green and
+olive, Himawari's greener and much hazier: it sees the plain at about 66°.
+CIRA's Meteosat-9 GeoColor paints the sea grey and the land a vivid green,
+neither as MTG-I1 shows them; that is most of the difference in the table
+above.
+
+By night, SEVIRI's 10.8 − 3.9 µm difference runs higher than FCI's
+10.5 − 3.8 µm over the same ground at the same time. Medians on the same
+grid at 2026-11-10 00:00, where FCI's 10.5 µm reads 285–295 K: 2.6 K over
+land and 3.3 K over sea (2.4 and 2.9 K at 270–285 K). With the low-cloud ramp
+starting at 0 K as for the others, clear ground came out as a pale-blue
+sheet (night-seviri 58, 87, 109). The ramp for SEVIRI starts at 2.6 K over
+land and 3.3 K over sea. Its 10.8 µm reads 0.15 K above FCI's 10.5 µm, which
+the high-cloud layer can ignore.
+
 **Static files, fetched at image build**
 - `BlackMarble_2016_3km_geo.tif`, 64.4 MB, the city lights. **satpy 0.60.0
   cannot download it**: NASA moved the file. The working URL is
@@ -331,6 +462,13 @@ What still differs from CIRA:
 **Joining satellites**
 - The Mosaic computes each satellite's view angle on its own grid, from the
   longitude and height in the Rendering's projection and a spherical Earth.
+- For a satellite whose pixels are coarser it compares not the view angle
+  but the angle at which a 1 km imager would see as finely,
+  arccos(cos(angle) / km). For Meteosat-9's 3 km that is 70.5° straight
+  below it. That angle changes about a seventh as fast across the ground as a
+  view angle, so a 5° feather would be 900 to 1,300 km wide. At 2.5° it is
+  440 to 690 km between the equator and 60°N, the Seam between the two GOES
+  485 to 940 km.
   `satpy.modifiers.angles.get_satellite_zenith_angle` gives the same angle,
   but only on a Disk's grid.
 - The Renderings are warped to the Mosaic grid with GDAL (bilinear), in
@@ -494,6 +632,12 @@ What holds now, with the Recipe, the 5° Seam and only the Mosaic published:
 - A run scheduled for 22:10 on 2026-11-11 and started at 00:45 the next day
   built the 22:00 Slot, not the hour it started in. Looking back for late
   Disks then took 45 s.
+- With Meteosat-9, the 06:00 Slot of 2026-11-10, built from a shell on
+  2026-11-14 with two renders at once on 16 cores, took 11 min 40 s with all
+  five Disks: Meteosat-9's download 260 MB and 43 s, its render under 10 s;
+  the join 2 min 35 s. Its Mosaic is 309 MB. Seen at full resolution, the
+  strip Meteosat-9 shows is softer than its neighbours, being 3 km, and
+  clouds in its Seams look smeared rather than doubled.
 - Two renders at once on 16 cores (a Ryzen 9 5950X, all Disks already at
   their sources) built a Slot in 16 min 21 s, against 20 min 18 s for the Slot
   before with one at a time. The four renders took 10 min 35 s together, not

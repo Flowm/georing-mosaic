@@ -1,6 +1,6 @@
 # georing-mosaic
 
-Hourly colour imagery of the whole Earth, made from the raw scans of four
+Hourly colour imagery of the whole Earth, made from the raw scans of five
 geostationary satellites. Each hour it downloads one full-disk scan per
 satellite, renders each in colour (true colour by day, infrared cloud over
 city lights by night) and joins them into one global image.
@@ -42,6 +42,12 @@ here; [GLOSSARY.md](GLOSSARY.md) defines them.
 | `goes-west` | GOES-18 | 137.0°W | NOAA's open bucket on AWS |
 | `himawari` | Himawari-9 | 140.7°E | NOAA's open bucket on AWS |
 | `meteosat-0` | Meteosat-12 (MTG-I1) | 0° | EUMETSAT Data Store, with a free key |
+| `meteosat-iodc` | Meteosat-9 | 45.5°E | EUMETSAT Data Store, with the same key |
+
+Meteosat-9 covers only the strip around India, about 63 to 75°E, where the
+others view the ground at about 80° from vertical. Its imager is 3 km and has
+no blue or green band, so its day colour is looked up in a table of what
+MTG-I1 shows of the same ground.
 
 Each Slot uses the scan that starts on the hour. The scans arrive between 11
 and about 15 minutes past, Meteosat's sometimes near 30 past. A Slot is built
@@ -66,9 +72,9 @@ you, set `GEORING_UID` and `GEORING_GID` in `.env` first.
 The worker then builds a Slot at 10 past every hour and writes to `./out`.
 The Prefect UI at <http://localhost:4200> shows each run and its steps.
 
-Without a EUMETSAT key each Slot waits until 35 past for Meteosat and is
-then built from the three other satellites, with Meteosat's part of the
-Mosaic empty. The key is free: <https://api.eumetsat.int/api-key/>.
+Without a EUMETSAT key each Slot waits until 35 past for the two Meteosats
+and is then built from the three other satellites, with the Meteosats' part
+of the Mosaic empty. The key is free: <https://api.eumetsat.int/api-key/>.
 
 To build one Slot by hand, or every Slot since a time that is not done:
 
@@ -116,7 +122,8 @@ uv run georing-compare day night
 ```
 
 A render takes about four minutes on eight cores and peaks at 22 GB, so run
-one build at a time.
+one build at a time. Meteosat-9's colour table is remade with
+`georing-fit-colour`; the notes say how.
 
 ## Where things are written down
 

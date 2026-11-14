@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from georing.mosaic import blend, view_zenith
+from georing.mosaic import blend, seam_angle, view_zenith
 
 HEIGHT = 35786023.0
 EAST, WEST = -75.2, -137.0
@@ -26,20 +26,28 @@ def test_the_india_seam_is_viewed_at_about_80_degrees_from_both_sides():
     assert 78 < meteosat[0, 0] < 85  # inside the default limit
 
 
+def test_a_coarser_imager_counts_as_a_finer_one_looking_slantwise():
+    zenith = np.array([[0.0, 40.0]], dtype=np.float32)
+    assert seam_angle(zenith, 1.0) is zenith
+    # A 3 km pixel straight down is as large as a 1 km one seen at 70.5 degrees.
+    assert seam_angle(zenith, 3.0)[0, 0] == pytest.approx(np.degrees(np.arccos(1 / 3)), abs=1e-3)
+    assert seam_angle(zenith, 3.0)[0, 1] > 70.5
+
+
 def test_blend_takes_the_steeper_view_and_feathers_only_at_the_seam():
     lon = np.array([-110.0, (EAST + WEST) / 2, -102.0])
     lat = np.array([0.0])
     out = blend([
         layer(200, view_zenith(lat, lon, EAST, HEIGHT)),
         layer(100, view_zenith(lat, lon, WEST, HEIGHT)),
-    ], width=5.0)
+    ], widths=[5.0, 5.0])
     assert out[0, 0].tolist() == [100, 150, 200]
     assert out[3, 0].tolist() == [255, 255, 255]
 
 
 def test_blend_feather_ends_where_the_views_differ_by_the_seam_width():
     near = np.full((1, 1), 30.0, dtype=np.float32)
-    out = blend([layer(200, near), layer(100, near + 5.0)], width=5.0)
+    out = blend([layer(200, near), layer(100, near + 5.0)], widths=[5.0, 5.0])
     assert out[0, 0, 0] == 200
 
 
@@ -47,7 +55,7 @@ def test_a_satellite_without_data_leaves_the_pixel_to_its_neighbour():
     steep, shallow = np.full((1, 2), 20.0, np.float32), np.full((1, 2), 60.0, np.float32)
     hole = layer(200, steep)
     hole[1][3, 0, 0] = 0
-    out = blend([hole, layer(100, shallow)], width=5.0)
+    out = blend([hole, layer(100, shallow)], widths=[5.0, 5.0])
     assert out[0, 0].tolist() == [100, 200]
     assert out[3, 0].tolist() == [255, 255]
 
@@ -55,7 +63,7 @@ def test_a_satellite_without_data_leaves_the_pixel_to_its_neighbour():
 def test_a_pixel_no_satellite_sees_stays_transparent():
     empty = layer(200, np.full((1, 1), 20.0, np.float32))
     empty[1][3] = 0
-    assert blend([empty, empty], width=5.0)[:, 0, 0].tolist() == [0, 0, 0, 0]
+    assert blend([empty, empty], widths=[5.0, 5.0])[:, 0, 0].tolist() == [0, 0, 0, 0]
 
 
 # -- the join and encode steps, on two small Disks ---------------------------
@@ -113,3 +121,30 @@ def test_two_disks_are_joined_at_their_seam_and_published_on_the_web_tile_grid(t
         assert [src.width, *(src.width // f for f in src.overviews(1))] == [2048, 1024, 512]
         assert src.compression.value == "WEBP"
         assert abs(pixel(src, EAST)[0] - 200) <= 6 and pixel(src, 60.0)[3] == 0
+
+
+def test_a_coarser_imager_takes_over_only_where_it_sees_finer(tmp_path):
+    import rasterio
+
+    from georing.mosaic import join_renderings
+
+    renders = {
+        "meteosat-0": write_render(tmp_path / "zero.tif", 0.0, 200),
+        "meteosat-iodc": write_render(tmp_path / "iodc.tif", 45.5, 100),
+    }
+    joined = str(tmp_path / "joined.tif")
+    join_renderings(renders, joined, slot="2026-11-10T06:00:00+00:00", threads=2, zoom=3)
+
+    with rasterio.open(joined) as src:
+        # Meteosat-9 views 30E more steeply, but its 3 km pixels are larger there.
+        assert pixel(src, 30.0) == [200, 0, 0, 255]
+        assert pixel(src, 75.0) == [100, 0, 0, 255]
+
+
+def test_a_seam_takes_the_narrower_of_its_two_widths():
+    angle = np.full((1, 1), 30.0, dtype=np.float32)
+    # 3 degrees apart: inside a 5 degree Seam, outside a 2.5 degree one.
+    wide = blend([layer(200, angle), layer(100, angle + 3.0)], widths=[5.0, 5.0])
+    narrow = blend([layer(200, angle), layer(100, angle + 3.0)], widths=[5.0, 2.5])
+    assert 100 < wide[0, 0, 0] < 200
+    assert narrow[0, 0, 0] == 200

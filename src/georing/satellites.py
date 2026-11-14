@@ -17,7 +17,13 @@ class Satellite:
     # Anonymous S3 bucket in us-east-1, or None for the EUMETSAT Data Store.
     bucket: str | None = None
     collections: tuple[str, ...] = ()
+    # The Data Store's files of a product that make the Disk, by their names.
+    entries: str = ""
     expected_files: int = 0
+    # Size of the colour bands' pixels where the satellite looks straight
+    # down, in km. The Seam lies where two satellites see the ground equally
+    # fine (georing.mosaic.seam_angle).
+    pixel_km: float = 1.0
 
     def prefix(self, slot: datetime) -> str:
         """Return the bucket prefix holding the Disk that starts at ``slot``."""
@@ -72,9 +78,22 @@ SATELLITE_SET: tuple[Satellite, ...] = (
         "meteosat-0",
         "MTG-I1",
         "fci_l1c_nc",
-        # Normal resolution and high resolution: 40 body chunks each.
+        # Normal resolution and high resolution: 40 body chunks each. satpy
+        # cannot open the trailer chunk, so it is left out.
         collections=("EO:EUM:DAT:0662", "EO:EUM:DAT:0665"),
+        entries=r"-BODY-.*\.nc$",
         expected_files=80,
+    ),
+    Satellite(
+        "meteosat-iodc",
+        "Meteosat-9",
+        "seviri_l1b_native",
+        # Indian Ocean Data Coverage: one native-format file per scan.
+        collections=("EO:EUM:DAT:MSG:HRSEVIRI-IODC",),
+        entries=r"\.nat$",
+        expected_files=1,
+        # SEVIRI's bands are 3 km; its 1 km HRV band is not used (see the plan).
+        pixel_km=3.0,
     ),
 )
 

@@ -8,6 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
+from georing.satellites import by_position
+
 EARTH_RADIUS = 6378137.0
 HALF_WORLD = np.pi * EARTH_RADIUS  # Web Mercator spans +-20037508.34 m
 TILE = 512
@@ -16,9 +18,14 @@ TILE = 512
 # count on it (ADR 0001).
 ZOOM = 8
 # Half-width of the Seam: two satellites are feathered into each other where
-# their view angles differ by less than this. Chosen on real Slots; see the
-# plan.
+# their view angles, as seam_angle measures them, differ by less than this.
+# Chosen on real Slots; see the plan.
 SEAM_WIDTH_DEG = 5.0
+# The same for a Seam with a coarser imager. Its seam_angle changes about a
+# seventh as fast across the ground as a view angle does, so 5 degrees would
+# feather it over 900 to 1,300 km. This keeps it 440 to 690 km wide, as the
+# Seam between the two GOES is 485 to 940 km between the equator and 60N.
+COARSE_SEAM_WIDTH_DEG = 2.5
 # Beyond this view angle a Rendering is smeared along the limb and is left out.
 MAX_VIEW_ZENITH_DEG = 85.0
 # WebP quality of the published Mosaic (ADR 0004).
@@ -44,23 +51,44 @@ def view_zenith(lat: np.ndarray, lon: np.ndarray, sat_lon: float, sat_height: fl
     return np.degrees(np.arctan2(sin_g, cos_g - ratio)).astype(np.float32)
 
 
-def blend(layers: list[tuple[np.ndarray, np.ndarray]], width: float) -> np.ndarray:
-    """Blend RGBA ``layers`` of ``(zenith, rgba)`` into one RGBA array.
+def seam_angle(zenith: np.ndarray, pixel_km: float) -> np.ndarray:
+    """Return the view angle at which a 1 km imager sees the ground as finely.
 
-    Each pixel comes from the satellite that views it most steeply. Where
-    another satellite's view angle is within ``width`` degrees of that, the
-    two are feathered into each other: ``width`` is the Seam's half-width. A
-    satellite with no data at a pixel takes no part there, so its neighbours
-    fill the gap.
+    A pixel's footprint on the ground grows about as 1 / cos of the view
+    angle, so an imager of ``pixel_km`` at ``zenith`` sees as finely as a 1 km
+    one at arccos(cos(zenith) / pixel_km). The Mosaic takes each pixel from
+    the satellite that sees it finest by this angle: for satellites of equal
+    pixels it is the view angle itself, and a coarser one takes over only
+    where the finer ones look so slantwise that their pixels are as large.
+    """
+    if pixel_km == 1:
+        return zenith
+    cos = np.cos(np.radians(zenith)) / pixel_km
+    return np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))).astype(np.float32)
+
+
+def blend(layers: list[tuple[np.ndarray, np.ndarray]], widths: list[float]) -> np.ndarray:
+    """Blend RGBA ``layers`` of ``(angle, rgba)`` into one RGBA array.
+
+    Each pixel comes from the satellite with the smallest angle there, the
+    view angle as ``seam_angle`` measures it. Where another satellite's angle
+    is within ``width`` degrees of that, the two are feathered into each
+    other: ``widths`` holds each layer's Seam half-width, and a Seam takes
+    the narrower of its two. A satellite with no data
+    at a pixel takes no part there, so its neighbours fill the gap.
     """
     best = np.full(layers[0][0].shape, np.inf, dtype=np.float32)
-    for zenith, rgba in layers:
-        np.minimum(best, np.where(rgba[3] > 0, zenith, np.inf), out=best)
+    best_width = np.full(best.shape, np.inf, dtype=np.float32)
+    for (angle, rgba), layer_width in zip(layers, widths, strict=True):
+        finer = np.where(rgba[3] > 0, angle, np.inf) < best
+        best[finer] = angle[finer]
+        best_width[finer] = layer_width
     colour = np.zeros((3, *best.shape), dtype=np.float32)
     opacity = np.zeros(best.shape, dtype=np.float32)
     weight = np.zeros(best.shape, dtype=np.float32)
-    for zenith, rgba in layers:
-        w = np.clip((best + width - zenith) / width, 0.0, 1.0)
+    for (angle, rgba), layer_width in zip(layers, widths, strict=True):
+        seam = np.minimum(layer_width, best_width)
+        w = np.clip((best + seam - angle) / seam, 0.0, 1.0)
         w = w * w * (3.0 - 2.0 * w)
         w[rgba[3] == 0] = 0.0
         wa = w * rgba[3]
@@ -100,6 +128,7 @@ def join_renderings(
     lon_all = -np.degrees(centres / EARTH_RADIUS)
     lat_all = np.degrees(2 * np.arctan(np.exp(centres / EARTH_RADIUS)) - np.pi / 2)
 
+    pixel_km = {position: by_position(position).pixel_km for position in renders}
     orbit = {}
     for position, path in renders.items():
         with rasterio.open(path) as src:
@@ -130,21 +159,23 @@ def join_renderings(
         window = Window(col, row, CHUNK, CHUNK)
         lat, lon = lat_all[row : row + CHUNK], lon_all[col : col + CHUNK]
         zeniths = {p: view_zenith(lat, lon, *orbit[p]) for p in renders}
-        layers = []
+        angles = {p: seam_angle(zeniths[p], pixel_km[p]) for p in renders}
+        layers, widths = [], []
         best = np.full((CHUNK, CHUNK), np.inf, dtype=np.float32)
-        # Steepest view first, so that most chunks read one satellite only.
-        for position in sorted(renders, key=lambda p: zeniths[p].min()):
-            zenith = zeniths[position]
-            if zenith.min() >= MAX_VIEW_ZENITH_DEG or (zenith >= best + SEAM_WIDTH_DEG).all():
-                continue  # below the limit, or outside every Seam with a better view
+        # Finest view first, so that most chunks read one satellite only.
+        for position in sorted(renders, key=lambda p: angles[p].min()):
+            zenith, angle = zeniths[position], angles[position]
+            if zenith.min() >= MAX_VIEW_ZENITH_DEG or (angle >= best + SEAM_WIDTH_DEG).all():
+                continue  # below the limit, or outside every Seam with a finer view
             rgba = warped()[position].read(window=window)
             rgba[3][zenith > MAX_VIEW_ZENITH_DEG] = 0
             if rgba[3].any():
-                layers.append((zenith, rgba))
-                np.minimum(best, np.where(rgba[3] > 0, zenith, np.inf), out=best)
+                layers.append((angle, rgba))
+                widths.append(SEAM_WIDTH_DEG if pixel_km[position] == 1 else COARSE_SEAM_WIDTH_DEG)
+                np.minimum(best, np.where(rgba[3] > 0, angle, np.inf), out=best)
         if not layers:
             return window, None
-        return window, layers[0][1] if len(layers) == 1 else blend(layers, SEAM_WIDTH_DEG)
+        return window, layers[0][1] if len(layers) == 1 else blend(layers, widths)
 
     Path(dest).parent.mkdir(parents=True, exist_ok=True)
     origins = [(r, c) for r in range(0, pixels, CHUNK) for c in range(0, pixels, CHUNK)]

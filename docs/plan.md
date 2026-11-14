@@ -6,7 +6,7 @@ hour, `georing-slot` builds one from a shell with the same flow,
 `georing-backfill` queues past Slots, and `georing-compare` judges the Recipe
 on the Comparison scenes.
 
-Terms in capitals are defined in `GLOSSARY.md`. Reasons for the four decisions
+Terms in capitals are defined in `GLOSSARY.md`. Reasons for the five decisions
 that were real trade-offs are in `docs/adr/`; this file does not repeat them.
 What was looked up and measured on the way, such as the data sources, the
 behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
@@ -17,12 +17,16 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
 ### Inputs
 
 - **Satellite set:** GOES-East (GOES-19), GOES-West (GOES-18), Meteosat at 0°
-  (MTG-I1, also called Meteosat-12) and Himawari (Himawari-9). The set is a
-  setting, so a fifth satellite can be added.
+  (MTG-I1, also called Meteosat-12), Meteosat over the Indian Ocean
+  (Meteosat-9, position `meteosat-iodc`, since 2026-11-14) and Himawari
+  (Himawari-9). The set is a setting. Meteosat-9 fills the India seam, where
+  the others view the ground at about 80° (ADR 0005).
 - **Slot:** a full clock hour. A Slot uses each satellite's scan that starts on
   that hour (ADR 0002).
 - **No detail is discarded in processing.** The 0.5 km red band is used, so
-  Meteosat needs both of its collections (normal and high resolution).
+  Meteosat at 0° needs both of its collections (normal and high resolution).
+  The one exception is Meteosat-9's 1 km HRV band, which covers part of its
+  disk only (ADR 0005); see "Open items".
 
 ### Products
 
@@ -30,9 +34,9 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   published too at first, as COGs in each satellite's own view at 0.5 km.
   They were taken out on 2026-11-12: satvis, the one consumer, reads only the
   Mosaic, and they were half the storage and four encodes per Slot.
-- **Rendering:** the satellite's own geostationary projection at native 0.5 km,
-  written lossless to scratch, where the Mosaic is joined from it and
-  compressed once.
+- **Rendering:** the satellite's own geostationary projection at its finest
+  resolution, 0.5 km (3 km for Meteosat-9), written lossless to scratch, where
+  the Mosaic is joined from it and compressed once.
 - **Mosaic:** Web Mercator at the resolution of zoom 8 (611 m per pixel at the
   equator, 65,536 px across) in 512 px tiles aligned to the web tile grid
   (ADR 0001), lossy WebP at quality 90 (ADR 0004). The full-resolution tiles
@@ -44,16 +48,32 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   on the tuning set of Comparison scenes and checked on the holdout set. What
   it changes and what is left is in the notes, under "Recipe". The owner
   judges when it is close enough; that judgement is open.
-- **Comparison scenes:** a tuning set of thirteen on 2026-11-10, which the
-  Recipe is fitted to, and a holdout set of eight on 2026-09-14 at other
-  places, which is only measured; listed in the notes, under "Recipe". The
-  reference for all four satellites is CIRA's GeoColor from SLIDER, in each
-  satellite's own view at 1 km. `georing-compare` renders each scene and
-  writes it beside its reference.
+- **Meteosat-9's day colour** is looked up in a table of the colour MTG-I1
+  shows for each combination of SEVIRI's red, 0.8 µm and 1.6 µm bands, made
+  by `georing-fit-colour` from what both see at the same time, and then takes
+  FCI's tone curves (ADR 0005). By night its low-cloud ramp starts 2.6 K
+  higher over land and 3.3 K over sea than the other sensors': SEVIRI's
+  10.8 − 3.9 µm difference runs that much above FCI's over the same clear
+  ground. How both were measured is in the notes, under "SEVIRI".
+- **Comparison scenes:** a tuning set of seventeen on 2026-11-10, which the
+  Recipe is fitted to, and a holdout set of ten at other places, which is only
+  measured: eight on 2026-09-14, and Meteosat-9's two on 2026-10-01, as
+  SLIDER no longer held it for 14 September when it was added. They are
+  listed in the notes, under "Recipe". The reference is CIRA's GeoColor from
+  SLIDER, in each satellite's own view at 1 km (3 km for Meteosat-9).
+  `georing-compare` renders each scene and writes it beside its reference.
+  For Meteosat-9 the reference is a check of the look only: its colour
+  follows MTG-I1, not CIRA.
 - **Seam:** a feathered band, written in our own code. satpy's multi-scene
   blend is experimental and a wide weighted average shows high clouds twice.
-  The band is where the two view angles differ by less than 5°, about 470 km
-  on the ground between the two GOES. The width was chosen on the
+  A pixel comes from the satellite that sees the ground finest there: a
+  pixel's footprint grows as 1 / cos of the view angle, so between the four
+  imagers of 0.5 to 1 km this is the steepest view, and Meteosat-9's 3 km
+  counts as 1 km seen at arccos(cos(angle) / 3) (ADR 0005). The band is where
+  the two angles so measured differ by less than 5°, about 470 km on the
+  ground between the two GOES; with Meteosat-9 it is 2.5°, since its angle
+  changes about a seventh as fast across the ground, which keeps those Seams
+  440 to 690 km wide. The width was chosen on the
   Slots of 2026-11-10 18:00 and 06:00 joined at 0.5°, 2°, 5° and 10°: 0.5°
   and 2° leave a line where the two satellites see haze, glint or dawn in
   different colours (off Brazil by day, at the date line at dawn, over India
@@ -61,10 +81,11 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   is plainly doubled, most of all at 70°E. The mean gradient in the band falls
   to 0.92–0.97 of its value at 0.5° with 5°, and to 0.83–0.93 with 10°.
 - **Limb:** a Rendering is not used where its satellite is more than 85° from
-  vertical. Beyond that the pixels are smeared streaks. This opens a gap
-  around 70°E poleward of about 45° latitude. The limit was tuned on
-  real images like the Seam.
-- **Deadline:** a Slot builds as soon as all four Disks are present, typically
+  vertical. Beyond that the pixels are smeared streaks. The limit was tuned on
+  real images like the Seam. Without Meteosat-9 this opens a gap around 70°E
+  poleward of about 45° latitude; with it the gap there begins near 70°.
+  Poleward of 76.5° no geostationary satellite sees any longitude.
+- **Deadline:** a Slot builds as soon as all its Disks are present, typically
   from 14 minutes past the hour. At 35 minutes past it builds without any Disk
   still missing. The measurement behind 35 is in the notes, under "Arrival
   times".
@@ -101,8 +122,8 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   runs in a child process of its own (`georing.step`). A step that has not
   finished after 30 minutes (the slowest takes five) is killed, with whatever
   it started, and counts as failed. A step inherits none of the EUMETSAT and
-  bucket credentials and has only those it is handed: Meteosat's download and
-  the look-back for late Disks get the EUMETSAT key.
+  bucket credentials and has only those it is handed: the two Meteosat
+  downloads and the look-back for late Disks get the EUMETSAT key.
 - **One Disk's failure does not cost the Slot.** A Disk that cannot be
   downloaded or rendered is left out and recorded as missing.
 - **Scratch is removed when a run ends,** failed or not. What a run that was
@@ -134,6 +155,7 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
 - **Renders run one at a time,** in the order their Disks arrive, so a late
   Disk does not hold up the others. Each render uses all eight cores, so two
   at once would finish no sooner, and the Meteosat render peaks at 21 GB.
+  Meteosat-9's render takes 5 s and 1.5 GB.
   On a larger machine the setting `parallel_renders`
   (`GEORING_PARALLEL_RENDERS` in `.env`) runs several at once. The worker
   then uses eight cores for each, as one pool: a render keeps to eight
@@ -261,7 +283,8 @@ reading".
 ## Open items
 
 - **EUMETSAT licence.** Confirm the reading in ADR 0002 with EUMETSAT before
-  the product is public.
+  the product is public. The policy lists hourly SEVIRI data, Meteosat-9's
+  among them, as Core data like FCI's (notes, "Licences and attribution").
 - **Meteosat's late cluster.** Find out whether products stamped near 30 past
   were already downloadable near 14 past: try the download at 15 past on such
   a Slot, or poll the search API for several hours (about one such scan every
@@ -285,7 +308,8 @@ reading".
   into a gradient; the difference itself remains. Off Brazil at 18:00
   Meteosat's side of the sea is grey-beige and GOES-East's blue; at the date
   line at dawn Himawari's side is grey and GOES-West's blue; at 70°E, viewed
-  at a low angle from both sides, haze differs by day. Each satellite looks at
+  at a low angle from both sides, haze differed by day until Meteosat-9 came
+  between them. Each satellite looks at
   the same sea from another side of the sun, so the Recipe would have to
   correct for the direction of view to close it. The feather was chosen on two
   Slots between 32°S and 32°N. Poleward of 50° it was looked at on the 18:00
@@ -306,7 +330,18 @@ reading".
   `If-Match` with a wrong ETag with 412. Not yet checked: reading it over the
   bucket's public address and from a browser (cross-origin), and lifecycle
   rules.
-- **The India seam.** Around 70°E both Meteosat and Himawari view the ground at
-  about 80° from vertical, so quality there is poor. This is a known limit of
-  the first version. The candidates checked and why each fails are in the notes,
-  under "Data sources".
+- **Meteosat-9's HRV band.** SEVIRI's 1 km broadband band could sharpen its
+  part of the Mosaic where it covers the disk, at the cost of a step in
+  sharpness where it ends. Not tried.
+- **Meteosat-9's colour against CIRA.** Its Comparison scenes differ from
+  CIRA's Meteosat-9 GeoColor by 11 to 29 levels by day: CIRA paints its sea
+  grey and its land greener than MTG-I1 shows them. By night they differ by
+  4 to 26. Whether the made-up colour is close enough at its Seams is the
+  owner's judgement, with the Recipe's.
+- **Meteosat-9's colour table** was made from five Slots, three in November
+  and two in September. Snow, and ground greener than the Sahel's, are
+  thinly covered. A table made from more seasons would tell whether it
+  holds through the year.
+- **Who serves the Indian Ocean next.** Meteosat-9 is old and serves the
+  Indian Ocean as EUMETSAT's "best effort". When it is replaced, the new
+  satellite's bands decide whether its colour table still applies.

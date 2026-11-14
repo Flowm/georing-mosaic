@@ -23,3 +23,14 @@ def test_himawari_matches_the_ten_segments_of_each_needed_band():
     assert pattern.search("HS_H09_20261110_1800_B03_FLDK_R05_S0710.DAT.bz2")
     assert not pattern.search("HS_H09_20261110_1800_B05_FLDK_R20_S0710.DAT.bz2")
     assert not pattern.search("HS_H09_20261110_1810_B03_FLDK_R05_S0710.DAT.bz2")
+
+
+def test_a_meteosat_disk_is_the_files_its_reader_opens():
+    import re
+
+    fci, seviri = by_position("meteosat-0"), by_position("meteosat-iodc")
+    stem = "W_XX-EUMETSAT-Darmstadt,IMG+SAT,MTI1+FCI-1C-RRAD-FDHSI-FD--CHK-"
+    assert re.search(fci.entries, f"{stem}BODY---NC4E_C_EUMT_20261110180713_IDPFI_OPE_20261110180007_20261110180017_N_JLS_C_0108_0001.nc")
+    assert not re.search(fci.entries, f"{stem}TRAIL---NC4E_C_EUMT_20261110181013_IDPFI_OPE_20261110180007_20261110180924_N_JLS_C_0108_0000.nc")
+    assert re.search(seviri.entries, "MSG2-SEVI-MSG15-0100-NA-20261110061239.803000000Z-NA.nat")
+    assert not any(re.search(seviri.entries, name) for name in ("EOPMetadata.xml", "manifest.xml"))

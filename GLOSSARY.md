@@ -14,8 +14,8 @@ _Avoid_: Timestep, frame, cycle
 
 **Satellite set**:
 The geostationary positions that contribute Disks: GOES-East, GOES-West,
-Meteosat at 0° and Himawari. A position, not a spacecraft: the satellite
-serving it can change.
+Meteosat at 0°, Meteosat over the Indian Ocean and Himawari. A position, not
+a spacecraft: the satellite serving it can change.
 _Avoid_: Constellation, ring
 
 **Disk**:
@@ -27,7 +27,8 @@ _Avoid_: Scene, scan, granule, image
 **Recipe**:
 The rule that turns a Disk's bands into colour: true colour by day, infrared
 clouds over city lights by night, blended across the terminator. One Recipe
-serves every satellite.
+serves every satellite; for Meteosat-9, which has no blue or green band, it
+looks the day colour up in a table of MTG-I1's.
 _Avoid_: Composite (satpy's word for its band recipes: say "satpy composite"
 when that is meant), GeoColor
 
@@ -43,7 +44,8 @@ _Avoid_: Composite, blend, ring image
 
 **Seam**:
 The line in a Mosaic where two Renderings meet, placed where both satellites
-view the ground at the same angle.
+see the ground equally finely: where they view it at the same angle, for
+satellites whose pixels are the same size.
 _Avoid_: Border, overlap, cut line
 
 ### Reference
@@ -55,8 +57,8 @@ not a reference. Never the name of anything produced here.
 
 **Comparison scene**:
 A fixed place and time at which a Rendering is judged against GeoColor. There
-are twenty-one in two sets. The thirteen of the **tuning set** (2026-11-10) are
-what the Recipe is fitted to and looked at. The eight of the **holdout set**
-(2026-09-14, other places) are only measured, never tuned against: they tell
-whether a change holds where it was not made.
+are twenty-seven in two sets. The seventeen of the **tuning set** (2026-11-10)
+are what the Recipe is fitted to and looked at. The ten of the **holdout set**
+(2026-09-14, and 2026-10-01 for Meteosat-9; other places) are only measured,
+never tuned against: they tell whether a change holds where it was not made.
 _Avoid_: Test image, sample

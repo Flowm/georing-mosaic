@@ -1,6 +1,7 @@
 # The Recipe: true colour by day, infrared clouds over city lights by night,
 # blended across the terminator. This file holds what every sensor shares;
-# abi.yaml, ahi.yaml and fci.yaml name each sensor's bands for the day layer.
+# abi.yaml, ahi.yaml and fci.yaml name each sensor's bands for the day layer;
+# seviri.yaml makes its colour from bands that are not colours.
 # It follows satpy's geo_color and departs from it where the Comparison scenes
 # showed a difference from CIRA's GeoColor.
 sensor_name: visir
