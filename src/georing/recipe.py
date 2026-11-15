@@ -1,4 +1,4 @@
-"""The Recipe's own steps: a compositor, and enhancement steps.
+"""The Recipe's own steps: compositors, and enhancement steps.
 
 satpy calls these by name from ``src/georing/satpy``. Curve points are
 written on a 0 to 255 scale, as they are read off an image; the image data
@@ -12,6 +12,11 @@ from pathlib import Path
 import dask.array as da
 import numpy as np
 from satpy.composites.core import GenericCompositor
+from satpy.composites.fill import (
+    DayNightCompositor,
+    _get_band_names,
+    _get_single_band_data,
+)
 
 
 def colour_from_table(bands: np.ndarray, centres: np.ndarray, table: np.ndarray) -> np.ndarray:
@@ -58,6 +63,70 @@ class ColourTable(GenericCompositor):
         )
         rgb = [projectables[0].copy(data=colour[i]) for i in range(3)]
         return super().__call__(rgb, **attrs)
+
+
+def twilight(day, night, sunz, weight, gain, offset, start, end, gamma=2.2):
+    """Join one channel of the day and night layers across the terminator.
+
+    ``day`` and ``night`` are display values from 0 to 1, ``sunz`` the sun
+    zenith in degrees and ``weight`` the day layer's share of the blend.
+    From ``start`` to ``end`` degrees the day layer's contrast is stretched
+    in: multiplied by ``gain`` less ``offset`` (on 0 to 255), held beyond.
+    The layers are then mixed as light, decoded with ``gamma``, so neither
+    greys the other where they overlap.
+    """
+    ramp = ((sunz - start) / (end - start)).clip(0, 1)
+    day = ((1 + (gain - 1) * ramp) * day - offset / 255 * ramp).clip(0, 1)
+    night = night.clip(0, 1)
+    return (weight * day**gamma + (1 - weight) * night**gamma) ** (1 / gamma)
+
+
+class TwilightCompositor(DayNightCompositor):
+    """satpy's day/night compositor, with the day layer's low-sun haze taken out.
+
+    The low-sun day layer carries Rayleigh light the correction leaves in: a
+    veil over dark sea and blue in the cloud shadows, where CIRA's GeoColor
+    keeps its contrast and its shadows dark. ``gain`` and ``offset`` hold,
+    for red, green and blue, the stretch that takes it out, more in blue as
+    the haze is blue; ``stretch_start`` and ``stretch_end`` are the sun
+    zeniths it ramps in between. The blend between ``lim_low`` and
+    ``lim_high`` follows satpy's weights but mixes the layers as light (see
+    `twilight`).
+    """
+
+    def __init__(self, name, gain=(1.0, 1.0, 1.0), offset=(0.0, 0.0, 0.0),
+                 stretch_start=76.0, stretch_end=78.0, gamma=2.2, **kwargs):
+        self.gain, self.offset = tuple(gain), tuple(offset)
+        self.stretch = (stretch_start, stretch_end)
+        self.gamma = gamma
+        super().__init__(name, **kwargs)
+
+    def __call__(self, datasets, optional_datasets=None, **attrs):
+        datasets = self.match_data_arrays(datasets)
+        if len(datasets) > 2:
+            self._sunz = datasets[2]
+        else:
+            from satpy.modifiers.angles import get_cos_sza
+
+            self._sunz = np.rad2deg(np.arccos(get_cos_sza(datasets[0])))
+        return super().__call__(datasets, optional_datasets=optional_datasets, **attrs)
+
+    # satpy's own merge, but red, green and blue go through `twilight`.
+    def _merge_bands_with_weights(self, day_data, night_data, weights, attrs):
+        data = []
+        for b in _get_band_names(day_data, night_data):
+            day_band = _get_single_band_data(day_data, b)
+            night_band = _get_single_band_data(night_data, b)
+            name = str(b.values)
+            if name in ("R", "G", "B"):
+                i = "RGB".index(name)
+                band = twilight(day_band, night_band, self._sunz, weights, self.gain[i], self.offset[i],
+                                *self.stretch, gamma=self.gamma)
+            else:
+                band = day_band * weights + night_band * (1 - weights)
+            band.attrs = attrs
+            data.append(band)
+        return data
 
 
 def _interp(values: np.ndarray, xp: np.ndarray, fp: np.ndarray) -> np.ndarray:

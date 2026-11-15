@@ -183,6 +183,16 @@ pyspectral 0.14.3 and pyorbital 1.14.0.
   render of `geo_color` by 1.5 levels of 255 on average. It is therefore no
   independent reference. NASA GIBS carries CIRA's GeoColor for GOES regridded
   to lat/lon; SLIDER carries it for all four satellites, unregridded.
+- There are two official GeoColors. NOAA STAR's GOES-19 full disk
+  (`cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/`, JPEG at 10848 px on
+  SLIDER's grid kept about ten days, GeoTIFF about three) and GIBS's
+  `GOES-East_ABI_GeoColor` (1 km lat/lon, back to 2026-08-10) agree with each
+  other within 3 to 11 levels, and with SLIDER by day (STAR 5, GIBS 9 to 13),
+  but differ from SLIDER by 31 to 34 at night and 19 to 27 at dawn: NOAA's is
+  the older look, with a black night sea and day gone by about 80°. Measured
+  on 2026-11-14 on the day, night, dawn and h-dusk scenes. The Recipe follows
+  SLIDER; against NOAA it and SLIDER are equally far off (21 to 25 at
+  twilight).
 - The night layer needs two static images that sit on their own lat/lon
   grids, so a plain `load` leaves `geo_color` unmade
   ([issue #2733](https://github.com/pytroll/satpy/issues/2733)). The render
@@ -210,14 +220,14 @@ now.
 |---|---|---|---|---|---|---|
 | day | tuning | GOES-East, 18:00 | Florida, Cuba, the Bahamas | 10, 15, 17 | 4, 6, 5 | 3, 4, 4 |
 | night | tuning | GOES-East, 06:00 | the eastern United States | 27, 23, 26 | 25, 22, 23 | 7, 6, 6 |
-| terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 8, 9, 11 |
+| terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 7, 8, 11 |
 | glint | tuning | GOES-West, 18:00 | the Pacific at 9°S 115°W | 9, 15, 18 | 2, 3, 3 | 1, 2, 1 |
 | snow | tuning | Himawari, 06:00 | Mongolia and Lake Baikal | 16, 16, 19 | 8, 10, 13 | 6, 8, 11 |
 | dust | tuning | Meteosat, 11:00 | the Sahara around Lake Chad | 15, 13, 18 | 3, 4, 6 | 0, 2, 4 |
 | day-ahi | tuning | Himawari, 06:00 | Australia and the Coral Sea | 9, 11, 13 | 3, 5, 5 | 1, 3, 3 |
 | day-fci | tuning | Meteosat, 11:00 | the Gulf of Guinea and central Africa | 14, 17, 23 | 3, 5, 5 | 0, 2, 2 |
 | night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 1, 1, 1 |
-| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 11, 10, 11 |
+| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 8, 8, 10 |
 | glint-ahi | tuning | Himawari, 02:00 | around New Guinea | 7, 8, 9 | 3, 4, 6 | 2, 2, 4 |
 | storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 3, 2, 5 |
 | storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 2, 2, 2 |
@@ -225,13 +235,13 @@ now.
 | h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 0, 3, 6 |
 | h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 4, 4, 4 |
 | h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 3, 3, 3 |
-| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 11, 14, 17 |
+| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 8, 12, 14 |
 | h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 5, 5, 7 |
 | h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 2, 6, 4 |
 | h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 4, 7, 8 |
 | day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 27, 23, 14 |
 | snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 28, 22, 17 |
-| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 9, 11, 15 |
+| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 11, 13 |
 | night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 22, 26 |
 | h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 17, 10, 17 |
 | h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 5 |
@@ -269,6 +279,18 @@ What the Recipe changes from `geo_color`:
   CIRA's does, and the Rayleigh correction, which does not shrink with it,
   warms the tone. Tried at 78, 81, 82, 84 and 88°: 80 is best on both
   terminator scenes.
+- **Twilight: the day layer's haze stretched out, the layers mixed as
+  light** (`georing.recipe.TwilightCompositor`, replacing satpy's
+  day/night compositor). From 76° to 78° of sun zenith the day layer is
+  stretched to 1.2, 1.3 and 1.4 times itself less 30, 45 and 65 levels (R,
+  G, B), held beyond: that takes out the blue haze the Rayleigh fade leaves,
+  the milky veil over dark sea and the blue in cloud shadows. The night layer
+  comes in from 82° to 86°, mixed as light (gamma 2.2), where satpy blends
+  78° to 88° on display values. Rendered on 2026-11-15: terminator 9.0 to
+  8.6, dawn 10.6 to 8.5, dusk-seviri 11.8 to 11.3, holdout h-dawn 13.3 to
+  11.1, h-dusk 5.3 unchanged; snow, the only other scene that reaches 76°,
+  unchanged. The real renders match the offline model within 0.3. How it
+  was found is under "The terminator" below.
 - **Rayleigh correction fades out toward the terminator,** from full at a sun
   angle of 70° to a tenth at 88°. At full strength it takes out more blue than
   a low sun puts in, and dusk turns olive.
@@ -322,14 +344,75 @@ What the Recipe changes from `geo_color`:
   brightness, once its infrared layer is taken off.
 
 What still differs from CIRA:
-- **The terminator.** Tuning dusk 12.3, dawn 12.1, holdout dawn 18.1 (blue
-  worst). On the tuning scenes ours is too bright at sun angles near 74° at
-  dawn, too dark near 82°, and short of blue over clear sea at 66–72° at dusk.
-  No single setting of the sun-angle limit, the Rayleigh fade or the day/night
+- **The terminator.** With the twilight compositor: terminator 8.6, dawn
+  8.5, dusk-seviri 11.3, holdout h-dawn 11.1 (blue worst, 14), h-dusk 5.3.
+  What is left: past 84° CIRA's night sea is dark teal with grey low cloud
+  where ours is black (ProxyVis, below); Meteosat-12 would take a milder blue
+  stretch than GOES and Himawari; ours is short of blue over clear sea at
+  66–72° at dusk. Before the compositor, no single setting of the sun-angle limit, the Rayleigh fade or the day/night
   blend (tried: fade strength 0, 0.5, 0.6, fade ending at 84°, blend 76–86,
-  80–87, 82–90, 84–92) improves both. CIRA's 2025 update changed its
-  twilight blend; how is not published.
-- **Sun glint on Himawari** (holdout 10.3): ours is 6 to 10 levels darker over
+  80–87, 82–90, 84–92) improves both. GeoColor as published (Miller et al.
+  2020, JTECH 37, 429) blends day and night by cos(sun zenith) scaled over
+  0.1–0.3 (72.5°–84.3°) and raised to the power 1.5, in display values,
+  "bounds selected experimentally based on matching to the observed dimming
+  behavior of VIS imagery near the terminator"; that is NOAA's operational
+  look. CIRA's 2025 update narrows the twilight zone and extends the day
+  side, moving sunrise and sunset by up to an hour (its Quick Guide); the
+  formula is not published.
+  Studied on 2026-11-14 with the day and night layers rendered apart, on the
+  five twilight scenes (offline blends match the rendered Recipe within 0.2):
+  at 76–80° the low-sun day layer is up to 20 levels too bright, a milky
+  veil over dark sea, and at 80–88° the picture is about 10 too dark, alike
+  on ABI, AHI and FCI. Fitted per 2° band, CIRA is close to 0.8 × day from
+  78° to 83° with the night layer added on top from about 81° (the weights
+  sum to 1.05 to 1.35), and a black-point offset of −13 to −35 levels at dusk
+  and −16 to −78 at dawn fits it better still. Weights fitted that way gain
+  on the scenes they were fitted to and nothing on the holdout. More
+  Rayleigh correction (strength 0 or a fade from 80 to 90°) or the sun-angle
+  limit at 76° made every scene worse (terminator 9 to about 20). The sun
+  angle at each line's scan time instead of the scan's start also made the
+  fits worse. The best candidate, the day layer raised to a power of up to
+  1.3 from 74° to 86° and blended in linear light from 82° to 86°, measured
+  offline: terminator 9.0 to 8.6, dawn 10.6 to 9.6, dusk-seviri 11.8 to
+  11.6, h-dawn 13.3 to 12.3, h-dusk 5.3 unchanged. CIRA's Meteosat-9
+  GeoColor ends its day layer near 80°, another scheme.
+  Followed up on 2026-11-15 by local contrast (standard deviation of
+  brightness in a 15 px Gaussian window) per 2° of sun angle. At 74–80° CIRA
+  keeps far more contrast than ours, where ours is still the day layer
+  alone: dawn 37/32/31 against 31/23/19, h-dawn 42/47/52 against 37/35/34.
+  The veil is in the day layer, not the blend: a contrast-preserving blend
+  (Grundland et al. 2006) gains at most 0.1. The day layer with full Rayleigh
+  correction matches CIRA's contrast within 3 but is 10 to 40 levels darker.
+  Fitted per degree, CIRA ≈ a · day + c with a of 1.1 to 1.3 and c of −7 to
+  −46 over 74–80°, a contrast stretch, then the night layer from 82°. A
+  smooth form of it, the day layer stretched to 1.2 · day − 35 levels
+  (ramped in from 76° to 78°, held beyond) and blended in linear light
+  from 82° to 86°, fitted on terminator and dawn only, measured offline:
+  terminator 9.0 to 8.9, dawn 10.6 to 8.7, dusk-seviri 11.8 to 11.5, h-dawn
+  13.3 to 11.1, h-dusk 5.3 unchanged. It beats the power curve everywhere but the terminator (8.6).
+  By eye it is the closest at 78–84°, but cloud shadows stay blue where
+  CIRA's are dark and neutral to brown: the haze left in the day layer is
+  Rayleigh light, and CIRA takes out more of it in blue. Fitted per channel
+  at 78–80°, its offsets are about −40, −60 and −80 (R, G, B) at dawn and
+  −40, −85 and −115 on h-dawn, with gains of 1.3, 1.45 and 1.6. A stretch
+  per channel of gain 1.3/1.45/1.6 and offset 45/70/100 matches the shadows
+  by eye and scores h-dawn 10.1, dawn 9.1, dusk-seviri 11.2, h-dusk 5.4, but
+  terminator (Meteosat-12) 11.2; a milder one (1.2/1.25/1.3, 25/37.5/50)
+  scores 8.2, 8.9, 11.4, 11.2 and 5.3. The Recipe takes one between them,
+  1.2/1.3/1.4 and 30/45/65 (offline 8.6, 8.6, 11.3, 10.8, 5.3). Full Rayleigh correction darkens the
+  shadows too but turns the low-sun cloud orange.
+  Past 84° CIRA's fine detail stops following our day layer (correlation of
+  the image less a 4 px blur: 0.86–0.90 at 84°, 0.3–0.5 at 86°, 0.1 at
+  88°), so its day side ends about where ours does; its sea stays dark teal
+  instead of black there. Its night detail follows ours at 0.95–0.99 on
+  Meteosat-12 but 0.7–0.8 on GOES and 0.4–0.5 on Himawari: CIRA's 2025
+  GeoColor draws low cloud over the ocean with ProxyVis (Chirokova et al.
+  2023, Wea. Forecasting 38, 2527), a linear regression on infrared bands
+  trained on VIIRS Day/Night Band imagery (3.9, 10.3 and 12.3 µm in the
+  Quick Guide; the released code's main form adds 8.4 µm), and keeps
+  the legacy fog test over land. CIRA's code is on Zenodo (record
+  12625308) under the AGPL-3.0; the paper's equations are the part to take.
+- **Sun glint on Himawari** (holdout 8.3): ours is 6 to 10 levels darker over
   the glint than CIRA's, and greyer. The AHI glint tuning scene shows no such
   difference.
 - **Vegetation on Himawari** is greener and more saturated than CIRA's (New
@@ -337,8 +420,15 @@ What still differs from CIRA:
 - **Shallow water** is still bluer than CIRA's turquoise, though its mean is
   within 6 levels.
 - **City lights are coarser:** the Black Marble image is 3 km and the night
-  layer is finished on the infrared grid.
-- **Snow on Himawari** (tuning 12.2): dry ground is too blue, and high cloud
+  layer is finished on the infrared grid. On h-dawn the lights as rendered
+  are blobs wider than the 3 km image itself warped straight onto the 1 km
+  window, so the infrared grid costs more than the source. NASA publishes
+  the same Black Marble 2016 at 500 m (15″) in eight tiles of 21600 × 21600,
+  `BlackMarble_2016_{A,B,C,D}{1,2}_geo.tif`, 0.3 to 0.5 GB each, beside the
+  3 km file; averaged onto the window it shows towns and roads as CIRA's
+  does, if still softer. The colours by brightness were fitted at 3 km and
+  come out too heavy at 500 m.
+- **Snow on Himawari** (tuning 10.7): dry ground is too blue, and high cloud
   is greyer than CIRA's since the cloud-top step was taken out.
 
 **SEVIRI**
