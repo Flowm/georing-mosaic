@@ -36,3 +36,15 @@ def test_the_holdout_set_is_another_day_and_other_places():
         return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
     assert not any(overlap(h.bbox, t.bbox) for h in holdout for t in tuning)
+
+
+def test_a_rendering_is_cropped_to_cover_the_whole_window():
+    from georing.compare import Window
+
+    # Pixels of 1 km; the window is 3 rows by 2 columns, 10 rows and 20
+    # columns in from the Disk's top-left corner at (-100 km, 50 km).
+    win = Window(None, -100_000.0, 50_000.0, 1000.0, row=10, col=20, height=3, width=2)
+    assert win.bounds() == (-80_000.0, 37_000.0, -78_000.0, 40_000.0)
+    assert win.bounds(margin=4) == (-84_000.0, 33_000.0, -74_000.0, 44_000.0)
+    # The window's own transform starts at its north-west corner.
+    assert (win.transform.c, win.transform.f) == win.bounds()[0::3]
