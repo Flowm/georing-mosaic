@@ -222,6 +222,7 @@ def _slot(text: str) -> datetime:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from georing.lights.cog import lights_path
     from georing.settings import load_dotenv, settings
     from georing.static import fetch_static
     from georing.step import runtime_env
@@ -237,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
     work = args.work.resolve()
     static = settings().static if settings().static_dir else work / "static"
     fetch_static(str(static))
-    os.environ.update(runtime_env(static, args.cores), **load_dotenv(args.env_file))
+    os.environ.update(runtime_env(static, args.cores, lights_path(work)), **load_dotenv(args.env_file))
 
     data = {}
     for slot in [*args.slots, *args.check]:

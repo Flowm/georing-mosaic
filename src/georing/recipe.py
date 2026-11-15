@@ -156,17 +156,6 @@ def channel_curves(img, xp, red, green, blue, **kwargs):
     return _recolour(img, lambda band: img.data.sel(bands=band).data, xp, (red, green, blue))
 
 
-def colour_by_brightness(img, xp, red, green, blue, **kwargs):
-    """Colour an image by its own brightness.
-
-    ``xp`` holds brightness levels, the mean of the three channels; ``red``,
-    ``green`` and ``blue`` hold the colour given to each level. The image's
-    own hue is dropped.
-    """
-    brightness = img.data.sel(bands=["R", "G", "B"]).mean("bands").data
-    return _recolour(img, lambda band: brightness, xp, (red, green, blue))
-
-
 def uniform_luminance(img, level, **kwargs):
     """Give every pixel of a luminance-alpha image the same luminance.
 

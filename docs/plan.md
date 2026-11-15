@@ -27,6 +27,10 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   Meteosat at 0° needs both of its collections (normal and high resolution).
   The one exception is Meteosat-9's 1 km HRV band, which covers part of its
   disk only (ADR 0005); see "Open items".
+- **City lights:** NASA's yearly Black Marble from NOAA-20 (VJ146A4, 2025),
+  radiance and a land mask at 500 m, which the flow builds once into a COG
+  under the work directory with the owner's NASA Earthdata login, and which
+  the Recipe puts on each satellite's finest grid (ADR 0006).
 
 ### Products
 
@@ -302,9 +306,9 @@ reading".
   Himawari's sun glint and snow miss their targets. On 2026-11-15 the owner
   judged the twilight at 78–84° closest to CIRA's, and named two gaps: low
   cloud and sea past 84°, which CIRA draws with ProxyVis over the ocean, and
-  the city lights, 3 km and finished on the infrared grid where NASA has them
-  at 500 m. What still differs from CIRA is listed in the notes, under
-  "Recipe".
+  the city lights, then 3 km and finished on the infrared grid. The lights
+  are now 500 m (ADR 0006); ProxyVis is open. What still differs from CIRA is
+  listed in the notes, under "Recipe".
 - **The references are not kept.** SLIDER holds some weeks, and the copies
   under `work/comparison/reference/` are not in git: they are CIRA's images.
   Decide where the Comparison scenes' references and Disks are to live.

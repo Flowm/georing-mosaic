@@ -61,7 +61,7 @@ less than 40 GB free. A Slot is about 3 GB of download and takes about 17
 minutes to build.
 
 ```bash
-cp .env.example .env        # then put in the EUMETSAT key and secret
+cp .env.example .env        # then put in the EUMETSAT key and the Earthdata login
 mkdir -p out
 docker compose up -d --build
 ```
@@ -91,6 +91,7 @@ that matter most:
 | Variable | What it does |
 |---|---|
 | `EUMETSAT_CONSUMER_KEY`, `EUMETSAT_CONSUMER_SECRET` | Meteosat's downloads |
+| `EARTHDATA_USERNAME`, `EARTHDATA_PASSWORD` | a NASA Earthdata login, for the city lights, which the first Slot builds once (51 GB of download, about 20 minutes) |
 | `GEORING_OUTPUT_URL` | where products go: empty for `./out`, or `s3://bucket/prefix` |
 | `GEORING_S3_ENDPOINT_URL`, `GEORING_S3_ACCESS_KEY_ID`, `GEORING_S3_SECRET_ACCESS_KEY` | the bucket, on AWS or a service that speaks S3, such as Cloudflare R2 |
 | `GEORING_PARALLEL_RENDERS` | renders at once; two want 16 CPUs and 64 GB |

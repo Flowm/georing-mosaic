@@ -56,6 +56,7 @@ def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIP
     import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
     from satpy import Scene
 
+    from georing.lights import layer as lights
     from georing.satellites import by_position
 
     sat = by_position(position)
@@ -69,19 +70,42 @@ def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIP
     scn.load([recipe])
     # satpy has now made what it can without resampling. The night layer is
     # stuck on its two static images, which sit on their own lat/lon grids
-    # (satpy issue #2733). Put them on the infrared grid and finish the night
-    # layer there, at 1 or 2 km, before anything is brought up to 0.5 km: the
-    # cloud compositors build whole-Disk arrays in memory.
+    # (satpy issue #2733). The land mask goes onto the infrared grid, where
+    # the cloud layers are made at 1 or 2 km before anything is brought up to
+    # 0.5 km: the cloud compositors build whole-Disk arrays in memory. The
+    # city lights go onto the finest grid, where the night layer is finished
+    # after the last resample, so that towns and roads keep their 500 m.
     # A Scene iterates over its datasets, not their keys.
     static = [k for k in scn.keys() if scn[k].attrs["area"].crs.is_geographic]  # noqa: SIM118
-    like = max(
+    gridded = sorted(
         (d for d in scn.values() if not d.attrs["area"].crs.is_geographic),
         key=lambda d: d.attrs["area"].pixel_size_x,
     )
+    finest, coarsest = gridded[0], gridded[-1]
+    cache = Path(grid_dir) / position
     for ds_id in static:
-        scn[ds_id] = static_on_grid(scn[ds_id], like.attrs["area"], like, Path(grid_dir) / position)
+        if lights.is_city_lights(scn[ds_id]):
+            chunks = _upsampled_chunks(coarsest, finest)
+            scn[ds_id] = lights.on_grid(scn[ds_id], finest.attrs["area"], chunks, cache)
+        else:
+            scn[ds_id] = static_on_grid(scn[ds_id], coarsest.attrs["area"], coarsest, cache)
     scn.generate_possible_composites(unload=True)
     return scn
+
+
+def _upsampled_chunks(coarse, fine) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Return the chunks ``coarse`` will have once the native resampler brings it to ``fine``'s grid.
+
+    The night layer is finished on the finest grid from the clouds, upsampled
+    from the infrared grid, and the city lights. Read in these chunks, the
+    lights join the clouds block for block, without a rechunk: in the finest
+    band's own chunks a GOES-East render peaked at 14.5 GB, in these at 12.2.
+    """
+    factor = round(coarse.attrs["area"].pixel_size_x / fine.attrs["area"].pixel_size_x)
+    chunks = tuple(tuple(c * factor for c in coarse.chunks[axis]) for axis in (-2, -1))
+    if tuple(sum(c) for c in chunks) != fine.attrs["area"].shape:
+        return fine.chunks[-2], fine.chunks[-1]
+    return chunks
 
 
 class _Known(logging.Filter):

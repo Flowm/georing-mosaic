@@ -316,6 +316,7 @@ def select(names: list[str], set_name: str | None) -> list[ComparisonScene]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from georing.lights.cog import build_city_lights, lights_path
     from georing.render import RECIPE
     from georing.settings import load_dotenv, settings
     from georing.static import fetch_static
@@ -345,9 +346,10 @@ def main(argv: list[str] | None = None) -> int:
     tmp.mkdir(parents=True, exist_ok=True)
     static = settings().static if settings().static_dir else work / "static"
     fetch_static(str(static))
-    os.environ.update(runtime_env(static, args.cores), TMPDIR=str(tmp))
-    out.mkdir(parents=True, exist_ok=True)
     secrets = load_dotenv(args.env_file)
+    lights = Path(build_city_lights(str(lights_path(work)), secrets))
+    os.environ.update(runtime_env(static, args.cores, lights), TMPDIR=str(tmp))
+    out.mkdir(parents=True, exist_ok=True)
 
     report = {}
     for scene in select(args.scenes, args.set):

@@ -157,6 +157,28 @@ With the 85° limb limit, on a grid of 0.25° between 85°S and 85°N:
 - A pass is not a Slot: using one means imagery from up to about 50 minutes
   either side of the hour.
 
+**City lights (NASA Black Marble, VJ146A4)** (ADR 0006)
+- VJ146A4 is NASA's yearly Black Marble from NOAA-20's VIIRS Day/Night Band,
+  collection 2 (LAADS archive set 5200): radiance in nW/cm²/sr, corrected
+  for moonlight and the atmosphere, at 15″ (240 px per degree). On
+  2026-11-15 LAADS held 2018 to 2025; 2025 is 540 tiles of HDF5 named
+  `VJ146A4.A2025001.hHHvVV.002.<made>.h5`, 10° × 10° each (h east from
+  180°W, v south from 90°N), 51 GB in all, listed without a login at
+  `https://ladsweb.modaps.eosdis.nasa.gov/api/v2/content/details/allData/5200/VJ146A4/2025/001`.
+- Each tile has 28 layers (Black Marble User Guide, collection 2.0, table
+  11). The Recipe keeps `AllAngle_Composite_Snow_Free` (float32, fill
+  −999.9; below 0.5 set to 0 by NASA) and `Land_Water_Mask` (0 land and
+  desert, 1 land, 2 inland water, 3 sea water, 5 coast).
+- The download wants an Earthdata Login bearer token. `POST
+  https://urs.earthdata.nasa.gov/api/users/find_or_create_token` with the
+  user name and password (HTTP Basic) returns the account's token or makes
+  one; tokens last 60 days, two per account. Without one LAADS answers 303 to
+  its login page. Now and then it answers 502: the build stopped there once
+  after 88 tiles, and asks again since.
+- Built on 2026-11-15 on a home line: 20 minutes for the 540 tiles at four
+  at a time, into a COG of 355 MB (two uint16 bands, ZSTD, overviews to 64).
+- NASA data: no licence terms, no attribution required.
+
 Sources:
 [AWS GOES](https://registry.opendata.aws/noaa-goes/),
 [AWS Himawari](https://registry.opendata.aws/noaa-himawari/),
@@ -219,32 +241,32 @@ now.
 | Scene | Set | Satellite, UTC | Place | `geo_color` | Before tuning | Recipe |
 |---|---|---|---|---|---|---|
 | day | tuning | GOES-East, 18:00 | Florida, Cuba, the Bahamas | 10, 15, 17 | 4, 6, 5 | 3, 4, 4 |
-| night | tuning | GOES-East, 06:00 | the eastern United States | 27, 23, 26 | 25, 22, 23 | 7, 6, 6 |
+| night | tuning | GOES-East, 06:00 | the eastern United States | 27, 23, 26 | 25, 22, 23 | 7, 5, 4 |
 | terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 7, 8, 11 |
 | glint | tuning | GOES-West, 18:00 | the Pacific at 9°S 115°W | 9, 15, 18 | 2, 3, 3 | 1, 2, 1 |
 | snow | tuning | Himawari, 06:00 | Mongolia and Lake Baikal | 16, 16, 19 | 8, 10, 13 | 6, 8, 11 |
 | dust | tuning | Meteosat, 11:00 | the Sahara around Lake Chad | 15, 13, 18 | 3, 4, 6 | 0, 2, 4 |
 | day-ahi | tuning | Himawari, 06:00 | Australia and the Coral Sea | 9, 11, 13 | 3, 5, 5 | 1, 3, 3 |
 | day-fci | tuning | Meteosat, 11:00 | the Gulf of Guinea and central Africa | 14, 17, 23 | 3, 5, 5 | 0, 2, 2 |
-| night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 1, 1, 1 |
-| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 8, 8, 10 |
+| night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 2, 1, 1 |
+| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 8, 8, 9 |
 | glint-ahi | tuning | Himawari, 02:00 | around New Guinea | 7, 8, 9 | 3, 4, 6 | 2, 2, 4 |
-| storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 3, 2, 5 |
-| storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 2, 2, 2 |
+| storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 1, 1, 1 |
+| storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 3, 2, 2 |
 | h-day-ahi | holdout | Himawari, 03:00 | Borneo, Java and Sulawesi | 8, 10, 10 | 3, 7, 8 | 1, 5, 5 |
 | h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 0, 3, 6 |
-| h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 4, 4, 4 |
-| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 3, 3, 3 |
-| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 8, 12, 14 |
+| h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 3, 4, 4 |
+| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 3, 2, 2 |
+| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 8, 12, 15 |
 | h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 5, 5, 7 |
 | h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 2, 6, 4 |
 | h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 4, 7, 8 |
 | day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 27, 23, 14 |
 | snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 28, 22, 17 |
 | dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 11, 13 |
-| night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 22, 26 |
+| night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 21, 25 |
 | h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 17, 10, 17 |
-| h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 5 |
+| h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 4 |
 
 Exact figures are in `difference.json` beside the images. satpy has no
 `geo_color` for SEVIRI, and Meteosat-9's scenes were added after the tuning,
@@ -259,7 +281,9 @@ Until 2026-11-14 our side of each pair had a black frame 3 to 7 px wide:
 the Rendering was cropped to the scene's longitudes and latitudes, which fell
 3 to 10 km short of SLIDER's rectangle around them. It added 1 to 2 levels
 to every figure, and the storm figures above include it. The Recipe column
-is measured without it, on 2026-11-14; the `geo_color` and before-tuning
+is measured without it, on 2026-11-14 (the twilight scenes on 2026-11-15
+with the twilight compositor, the night scenes, storms, dawn and h-dawn on
+2026-11-15 with the new city lights); the `geo_color` and before-tuning
 columns are not re-measured and still include it.
 Over the water of the Great Bahama Bank (79.5–77.5°W, 23–25.5°N) the day
 scene's mean colour is 44, 84, 105 against CIRA's 43, 90, 107; before tuning
@@ -338,14 +362,34 @@ What the Recipe changes from `geo_color`:
   (`georing_low_clouds`). `geo_color` starts it at 1.5 K for FCI. Dry ground
   emits less at 3.9 µm, so CIRA tints it bluish-lilac by night; the Recipe now
   does too, which fixed both warm-ground night scenes.
-- **City lights recoloured by brightness:** sea black, unlit land dark purple,
-  lights amber, deepening from the fringes to the cores. The colours are the
-  median CIRA shows over clear land of the night tuning scenes, per
-  brightness, once its infrared layer is taken off.
+- **City lights from radiance at 500 m** (ADR 0006, `georing.lights`):
+  NASA's Black Marble VJ146A4 for 2025 instead of the Black Marble 2016
+  picture at 3 km, warped onto the finest grid instead of the infrared one,
+  and coloured by radiance: sea a neutral 8, unlit land (23, 16, 41), lights
+  amber from 1.1 nW/cm²/sr to (214, 189, 157) at 140. The colours are the
+  median CIRA shows over land of the night and night-warm tuning scenes per
+  radiance, under a white infrared veil of the same strength as ours (solved
+  per pixel from our render; kept where the three channels agree, so not
+  under low cloud), once the veil is taken off. The holdout scenes give the
+  same colours, 0 to 10 dimmer from 7 to 30 nW/cm²/sr, and a sea of 7 to 8.
+  Carried over from Black Marble 2016 instead (its median brightness at each
+  radiance, which saturates at about 30), the lights came out too sparse:
+  CIRA lights towns from about 1 nW/cm²/sr. Black Marble 2016's sea was a
+  dark grey of 8, not black; made black, the night sea was 7 levels too dark
+  in every scene.
+  Rendered on 2026-11-15, against the Recipe before: night 6.3 to 5.6,
+  storms 3.3 to 0.7, night-warm 1.2, night-seviri 21.7 to 21.1, dawn 8.5 to
+  8.3; holdout h-night-cold 4.0 to 3.6, h-night-warm 3.0 to 2.5,
+  h-night-seviri 4.0 to 3.5. Worse: storms-east 1.8 to 2.2 and h-dawn 11.1 to
+  11.4. Storms gains as Black Marble 2016 kept terrain in its dark land and
+  drew the Congo forest near black, where CIRA and now ours show one purple;
+  around Lake Victoria CIRA's unlit land is a little lighter than that
+  purple.
 
 What still differs from CIRA:
-- **The terminator.** With the twilight compositor: terminator 8.6, dawn
-  8.5, dusk-seviri 11.3, holdout h-dawn 11.1 (blue worst, 14), h-dusk 5.3.
+- **The terminator.** With the twilight compositor and the new city lights:
+  terminator 8.6, dawn 8.3, dusk-seviri 11.3, holdout h-dawn 11.4 (blue
+  worst, 15), h-dusk 5.3.
   What is left: past 84° CIRA's night sea is dark teal with grey low cloud
   where ours is black (ProxyVis, below); Meteosat-12 would take a milder blue
   stretch than GOES and Himawari; ours is short of blue over clear sea at
@@ -419,15 +463,10 @@ What still differs from CIRA:
   Guinea in glint-ahi): the hybrid green, as satpy makes it.
 - **Shallow water** is still bluer than CIRA's turquoise, though its mean is
   within 6 levels.
-- **City lights are coarser:** the Black Marble image is 3 km and the night
-  layer is finished on the infrared grid. On h-dawn the lights as rendered
-  are blobs wider than the 3 km image itself warped straight onto the 1 km
-  window, so the infrared grid costs more than the source. NASA publishes
-  the same Black Marble 2016 at 500 m (15″) in eight tiles of 21600 × 21600,
-  `BlackMarble_2016_{A,B,C,D}{1,2}_geo.tif`, 0.3 to 0.5 GB each, beside the
-  3 km file; averaged onto the window it shows towns and roads as CIRA's
-  does, if still softer. The colours by brightness were fitted at 3 km and
-  come out too heavy at 500 m.
+- **City lights are a little softer than CIRA's**, now at 500 m (above); the
+  towns and roads are the same. Until 2026-11-15 they were blobs: the Black
+  Marble 2016 picture at 3 km, finished on the infrared grid, which cost more
+  sharpness than the 3 km source.
 - **Snow on Himawari** (tuning 10.7): dry ground is too blue, and high cloud
   is greyer than CIRA's since the cloud-top step was taken out.
 
@@ -491,17 +530,27 @@ land and 3.3 K over sea. Its 10.8 µm reads 0.15 K above FCI's 10.5 µm, which
 the high-cloud layer can ignore.
 
 **Static files, fetched at image build**
-- `BlackMarble_2016_3km_geo.tif`, 64.4 MB, the city lights. **satpy 0.60.0
-  cannot download it**: NASA moved the file. The working URL is
-  `https://assets.science.nasa.gov/content/dam/science/esd/eo/images/imagerecords/144000/144898/BlackMarble_2016_3km_geo.tif`,
-  and the file there matches satpy's checksum. Place it at
-  `<data_dir>/composites/` and set `SATPY_DOWNLOAD_AUX=False`. The Recipe
-  names both static images by file; their URLs and checksums are in
-  `georing.static` only.
 - `gshhs_land_water_mask_3km_i.tif`, 0.5 MB, from
-  `https://zenodo.org/records/10076199/files/`, into the same directory.
-- `georing-static` fetches both, and pyspectral's Rayleigh tables (54 MB)
+  `https://zenodo.org/records/10076199/files/`, into
+  `<data_dir>/composites/`, with `SATPY_DOWNLOAD_AUX=False`. Its URL and
+  checksum are in `georing.static` only.
+- `georing-static` fetches it, and pyspectral's Rayleigh tables (54 MB)
   and spectral responses (5 MB), and points pyspectral at them offline.
+- The city lights are not among them: the flow builds them once under the
+  work directory (`georing.lights`; above, under "Data sources"). Until
+  2026-11-15 they were `BlackMarble_2016_3km_geo.tif`, which satpy 0.60.0
+  could not download (NASA had moved it).
+- **Warping the lights onto a satellite's grid.** A warped VRT copied to a
+  GeoTIFF fails on Meteosat's grid with "Unknown GDAL Error": the grid
+  reaches past the Earth's edge (±5,568 km, the Earth ends near 5,434), so
+  whole chunks have no source and GDAL gives up ("Cannot determine source
+  window"), `ERROR_OUT_IF_EMPTY_SOURCE_WINDOW=NO` and `SAMPLE_GRID=YES`
+  notwithstanding. GOES's grid ends at the Earth's edge and warps. FCI's
+  grid also runs south-up (its extent has north and south swapped), which
+  GDAL does not warp onto. `georing.lights.layer` warps strips of 512 rows
+  with `rasterio.warp.reproject`, upright, skips a strip whose sampled points
+  all miss the Earth, and flips each strip into place: 21 s for Meteosat's
+  0.5 km grid, once per grid.
 
 **Readers**
 - `abi_l1b` for GOES.
@@ -521,6 +570,20 @@ the high-cloud layer can ignore.
 - satpy's `gradient_search` returns the static images in other chunks than the
   bands have, which also holds the whole Disk in memory. The render warps them
   with GDAL and reads them back in the bands' chunks.
+- **The city lights at 0.5 km** (2026-11-15, the 18:00 Disks of 2026-11-10,
+  eight cores, the warp of the lights already kept): with the clouds and the
+  lights put together on the finest grid as three layers, GOES-East took 164
+  s and 22.0 GB and Meteosat 201 s and 28.9 GB, against 104 s and 11.7 GB and
+  170 s and 22.5 GB for the Recipe before, measured the same day. The upsampled
+  layers' chunks are 16 times their infrared size, three layers came up
+  where one did, and the lights came as float64; float32 and chunks matched
+  to the clouds' still left 19.2 and 26.4 GB. With the clouds put together
+  on the infrared grid first and only that layer and the lights joined at
+  0.5 km: GOES-East 141 s and 12.2 GB, Meteosat 178 s and 21.0 GB, the same
+  picture to the decimal. Read in the finest band's chunks instead of the
+  clouds', the lights cost 2.3 GB more on GOES-East (14.5) and 0.7 more on
+  Meteosat (21.7), the same picture again. Warping the lights onto a grid takes 20 to 30 s,
+  once per satellite.
 - Settings: dask `array.chunk-size` of `32MiB`, `DASK_NUM_WORKERS` 4 to 8,
   `OMP_NUM_THREADS=1`, and a raised `GDAL_CACHEMAX`.
 - Maintainers report about 6 GB and under 140 s for a full-disk ABI

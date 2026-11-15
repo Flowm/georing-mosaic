@@ -12,6 +12,7 @@ from prefect.testing.utilities import prefect_test_harness
 
 from georing import download, flow
 from georing.download import DiskMissing
+from georing.lights.cog import NoLogin
 from georing.settings import settings
 from georing.step import StepFailed
 
@@ -31,6 +32,8 @@ def steps(tmp_path, monkeypatch):
     """Replace the heavy steps by ones that write empty files, and record what ran."""
     monkeypatch.setenv("GEORING_OUTPUT_URL", str(tmp_path / "out"))
     monkeypatch.setenv("GEORING_WORK_DIR", str(tmp_path / "work"))
+    monkeypatch.setenv("EARTHDATA_USERNAME", "someone")
+    monkeypatch.setenv("EARTHDATA_PASSWORD", "secret")
     settings.cache_clear()
     ran = {"unavailable": set(), "steps": []}
 
@@ -45,6 +48,11 @@ def steps(tmp_path, monkeypatch):
             Path(kwargs["dest"]).write_bytes(b"joined")
         if step == "mosaic encode":
             Path(kwargs["dest"]).write_bytes(b"mosaic")
+        if step == "city lights":
+            ran["lights_env"] = env
+            Path(kwargs["dest"]).parent.mkdir(parents=True, exist_ok=True)
+            Path(kwargs["dest"]).write_bytes(b"lights")
+            result = kwargs["dest"]
         if step == "late disks":
             ran["asked"] = kwargs["wanted"]
             result = download.disks_available(kwargs["wanted"])
@@ -71,6 +79,24 @@ def test_a_slot_renders_four_disks_and_publishes_a_mosaic_and_the_catalogue(step
     assert json.loads((out / "latest.json").read_text())["slot"] == "2026-11-10T18:00:00Z"
     assert (out / "catalog.json").exists()
     assert not (tmp_path / "work/scratch/20261110T1800Z").exists()
+
+
+def test_the_city_lights_are_built_once_with_the_earthdata_login(steps, tmp_path):
+    flow.build_slot(SLOT)
+    flow.build_slot(SLOT - timedelta(hours=1))
+
+    assert steps["steps"].count("city lights") == 1
+    assert (tmp_path / "work/lights/VJ146A4.A2025.tif").read_bytes() == b"lights"
+    assert steps["lights_env"]["EARTHDATA_USERNAME"] == "someone"
+
+
+def test_without_the_city_lights_or_a_login_no_disk_is_rendered(steps, monkeypatch):
+    monkeypatch.delenv("EARTHDATA_USERNAME")
+    monkeypatch.setattr(flow, "load_dotenv", lambda path: {})  # nor in a .env
+
+    with pytest.raises(NoLogin):
+        flow.build_slot(SLOT)
+    assert not [s for s in steps["steps"] if s.startswith("render")]
 
 
 def test_a_slot_that_is_done_is_not_built_again(steps):

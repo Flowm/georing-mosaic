@@ -18,7 +18,7 @@ DISK = AreaDefinition(
 def static_image(level: int) -> xr.DataArray:
     return xr.DataArray(
         np.full((3, 18, 36), level, dtype=np.uint8), dims=("bands", "y", "x"),
-        coords={"bands": ["R", "G", "B"]}, attrs={"name": "_city_lights", "area": WORLD},
+        coords={"bands": ["R", "G", "B"]}, attrs={"name": "_land_water_mask", "area": WORLD},
     )
 
 
@@ -57,3 +57,16 @@ def test_only_the_known_lines_of_the_libraries_are_kept_quiet(caplog):
         logging.getLogger("satpy.scene").warning("Something else went wrong")
         logging.getLogger("pyspectral.rsr_reader").warning("No sensor name specified in HDF5 file")
     assert caplog.messages == ["Something else went wrong"]
+
+
+
+def test_the_lights_are_read_in_the_chunks_the_cloud_layers_will_have():
+    class Area:
+        def __init__(self, size, shape):
+            self.pixel_size_x, self.shape = size, shape
+
+    coarse = xr.DataArray(da.zeros((6, 6), chunks=(4, 3)), dims=("y", "x"), attrs={"area": Area(2000, (6, 6))})
+    fine = xr.DataArray(da.zeros((24, 24), chunks=8), dims=("y", "x"), attrs={"area": Area(500, (24, 24))})
+    assert render._upsampled_chunks(coarse, fine) == ((16, 8), (12, 12))
+    odd = xr.DataArray(da.zeros((25, 24), chunks=8), dims=("y", "x"), attrs={"area": Area(500, (25, 24))})
+    assert render._upsampled_chunks(coarse, odd) == odd.chunks
