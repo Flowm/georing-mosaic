@@ -26,15 +26,20 @@ SCRATCH_NEEDED_GB = 40
 # Credentials a step does not inherit. It has one only when it is handed it,
 # as Meteosat's download is the EUMETSAT key.
 SECRETS = (
-    "EUMETSAT_CONSUMER_KEY", "EUMETSAT_CONSUMER_SECRET",
+    "EUMETSAT_CONSUMER_KEY", "EUMETSAT_CONSUMER_SECRET", "EARTHDATA_USERNAME", "EARTHDATA_PASSWORD",
     "GEORING_S3_ACCESS_KEY_ID", "GEORING_S3_SECRET_ACCESS_KEY",
 )
 
 
-def runtime_env(static: Path, cores: int) -> dict[str, str]:
-    """Return the environment satpy, dask and GDAL run under in a step."""
+def runtime_env(static: Path, cores: int, lights: Path) -> dict[str, str]:
+    """Return the environment satpy, dask and GDAL run under in a step.
+
+    ``lights`` is the city-lights COG (``georing.lights``), which the Recipe
+    names by this environment.
+    """
     return {
         **static_env(static),
+        "GEORING_CITY_LIGHTS": str(lights),
         "SATPY_CONFIG_PATH": str(Path(__file__).parent / "satpy"),  # the Recipe
         "OMP_NUM_THREADS": "1",
         "DASK_NUM_WORKERS": str(cores),

@@ -11,13 +11,8 @@ import os
 import urllib.request
 from pathlib import Path
 
-# satpy 0.60.0 still points at the URL NASA retired for the city lights.
+# The city lights are not among them: the flow builds them (georing.lights).
 STATIC_IMAGES = {
-    "BlackMarble_2016_3km_geo.tif": (
-        ("https://assets.science.nasa.gov/content/dam/science/esd/eo/images/"
-         "imagerecords/144000/144898/BlackMarble_2016_3km_geo.tif"),
-        "e915ef2a20d84e2a59e1547d3ad564463ad4bcf22bfa02e0e0b8ed1cd722e9c0",
-    ),
     "gshhs_land_water_mask_3km_i.tif": (
         "https://zenodo.org/records/10076199/files/gshhs_land_water_mask_3km_i.tif",
         "96df83c57416217e191f95dde3d3c1ce0373a8fc220e929228873db246ca3569",

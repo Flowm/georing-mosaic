@@ -55,24 +55,32 @@ enhancements:
     sensor: seviri
     operations: *fci_day
 
-  # The city lights: NASA's Black Marble, recoloured by its own brightness.
-  # Sea stays black, unlit land turns dark purple and the lights turn amber,
-  # deepening from the dim fringes to the bright cores. Read off the clear
-  # land of the night and night-warm tuning scenes: for each brightness, the
-  # median colour CIRA shows there once its infrared layer is taken off.
+  # The city lights, coloured by their radiance (nW/cm²/sr): sea a dark grey,
+  # unlit land dark purple, and the lights amber from about 1.1, deepening
+  # to a pale gold in the bright cores. Fitted to CIRA's GeoColor on the night
+  # and night-warm tuning scenes: for each radiance, the median colour CIRA
+  # shows on land under a pure white infrared veil, once the veil (the same
+  # as ours) is taken off; and so for unlit sea, 7.6 on night, 7 to 8 on the
+  # holdout scenes.
   georing_city_lights:
     standard_name: georing_city_lights
     operations:
+      - name: colour by radiance
+        method: !!python/name:georing.lights.layer.colour_by_radiance
+        kwargs:
+          xp: [0, 1, 1.25, 2.25, 3.8, 5.7, 10, 18, 32, 58, 103, 140]
+          red: [23, 25, 68, 86, 107, 125, 146, 161, 178, 188, 208, 214]
+          green: [16, 19, 32, 45, 62, 80, 101, 119, 140, 154, 181, 189]
+          blue: [41, 40, 39, 37, 40, 44, 60, 77, 99, 114, 146, 157]
+          sea: [8, 8, 8]
+
+  # Already enhanced, layer by layer: kept as it is.
+  georing_night_clouds:
+    standard_name: georing_night_clouds
+    operations:
       - name: stretch
         method: !!python/name:satpy.enhancements.contrast.stretch
-        kwargs: {stretch: crude, min_stretch: [0, 0, 0], max_stretch: [255, 255, 255]}
-      - name: colour by brightness
-        method: !!python/name:georing.recipe.colour_by_brightness
-        kwargs:
-          xp: [0, 10, 16, 45, 70, 92, 122, 165, 200, 255]
-          red: [0, 10, 26, 26, 76, 90, 106, 129, 153, 181]
-          green: [0, 10, 20, 19, 38, 50, 63, 84, 111, 145]
-          blue: [0, 12, 43, 43, 40, 39, 41, 49, 70, 105]
+        kwargs: {stretch: crude, min_stretch: [0, 0, 0, 0], max_stretch: [1, 1, 1, 1]}
 
   georing_high_clouds:
     standard_name: georing_high_clouds

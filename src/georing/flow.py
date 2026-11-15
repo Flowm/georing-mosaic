@@ -30,6 +30,7 @@ from prefect.futures import as_completed
 
 from georing.catalogue import Catalogue, mosaic_id, mosaic_item, stamp, to_slot
 from georing.download import DiskMissing
+from georing.lights.cog import LOGIN, NoLogin, lights_path
 from georing.satellites import by_position
 from georing.settings import Settings, load_dotenv, settings
 from georing.step import SCRATCH_NEEDED_GB, StepFailed, run_step, runtime_env
@@ -50,6 +51,9 @@ STEP_TIMEOUT = timedelta(minutes=30)
 RETRY_UNBUILT = timedelta(hours=6)
 # How far back the run of the hour looks for Slots that lack a Disk.
 LOOK_BACK = timedelta(hours=48)
+# Building the city lights downloads 51 GB once. A build stopped by this
+# limit goes on from where it was in the next run.
+LIGHTS_TIMEOUT = timedelta(hours=4)
 # A scratch directory untouched for this long was left by a run that died.
 STALE_SCRATCH = timedelta(hours=3)
 
@@ -64,16 +68,24 @@ def scheduled_slot(slot: datetime | None) -> datetime:
 
 
 def _env(cfg: Settings, scratch: Path, threads: int | None = None) -> dict[str, str]:
-    return {**runtime_env(cfg.static, threads or cfg.all_cores), "TMPDIR": str(scratch / "tmp")}
+    return {**runtime_env(cfg.static, threads or cfg.all_cores, _lights(cfg)), "TMPDIR": str(scratch / "tmp")}
 
 
-def _secrets() -> dict[str, str]:
-    """Return the EUMETSAT key and secret: from the environment, else from ``.env``."""
-    names = ("EUMETSAT_CONSUMER_KEY", "EUMETSAT_CONSUMER_SECRET")
+def _lights(cfg: Settings) -> Path:
+    return lights_path(cfg.work_dir.resolve())
+
+
+def _credentials(names: tuple[str, ...]) -> dict[str, str]:
+    """Return the credentials ``names``: from the environment, else from ``.env``; all of them or none."""
     found = {n: os.environ[n] for n in names if os.environ.get(n)}
     if len(found) < len(names):
         found = {n: v for n, v in load_dotenv(Path(".env")).items() if n in names and v}
     return found if len(found) == len(names) else {}
+
+
+def _secrets() -> dict[str, str]:
+    """Return the EUMETSAT key and secret, which the Data Store wants."""
+    return _credentials(("EUMETSAT_CONSUMER_KEY", "EUMETSAT_CONSUMER_SECRET"))
 
 
 def _askable(cfg: Settings) -> list[str]:
@@ -115,6 +127,28 @@ def download(position: str, slot: datetime, scratch: str, deadline: datetime) ->
             log.info("%s; asking every minute until %s", lacking, f"{deadline:%H:%M}")
             said = lacking
         time.sleep(POLL.total_seconds())
+
+
+@task(task_run_name="city-lights")
+def city_lights() -> str:
+    """Make sure the city-lights COG the Recipe reads is there; build it if it is not.
+
+    Built once, from NASA's tiles (``georing.lights``). Every render waits
+    for it.
+    """
+    cfg = settings()
+    path = _lights(cfg)
+    if path.exists():
+        return str(path)
+    credentials = _credentials(LOGIN)
+    if not credentials:
+        raise NoLogin(path)
+    get_run_logger().info("Building the city lights at %s; this downloads 51 GB once", path)
+    return run_step(
+        "city lights", "georing.lights.cog:build_city_lights",
+        {**runtime_env(cfg.static, 1, path), **credentials}, cfg.all_cores,
+        timeout_s=LIGHTS_TIMEOUT.total_seconds(), dest=str(path),
+    )
 
 
 @task
@@ -196,7 +230,7 @@ def late_disks(before: datetime) -> dict[str, list[str]]:
         return {}
     return _step(
         cfg, "late disks", "georing.download:disks_available",
-        {**runtime_env(cfg.static, 1), **secrets}, wanted=lacking,
+        {**runtime_env(cfg.static, 1, _lights(cfg)), **secrets}, wanted=lacking,
     )
 
 
@@ -311,6 +345,9 @@ def _build(
         download.with_options(task_run_name=f"download-{p}").submit(p, slot, str(scratch), deadline): p
         for p in cfg.satellite_set
     }
+    # Every render reads the city lights. Waiting for them here, the Disks
+    # still download meanwhile: a build of the lights must not make one late.
+    city_lights()
 
     renders: dict[str, str] = {}
     # Render each Disk as it arrives: a late one must not hold up the others.

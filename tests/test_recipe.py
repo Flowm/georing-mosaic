@@ -5,7 +5,6 @@ from trollimage.xrimage import XRImage
 
 from georing.recipe import (
     channel_curves,
-    colour_by_brightness,
     uniform_luminance,
 )
 
@@ -32,13 +31,6 @@ def test_curves_leave_alpha_and_missing_pixels_alone():
     out = channel_curves(img, xp=[0, 255], red=[0, 127.5], green=[0, 255], blue=[0, 255])
     assert levels(out.sel(bands=["R", "A"]).isel(x=[0])) == [[50, 77]]
     assert np.isnan(out.sel(bands="R").values[0, 1])
-
-
-def test_colour_by_brightness_drops_the_hue():
-    # Both pixels are equally bright, so they get the same colour.
-    out = colour_by_brightness(image([[90, 60, 30], [60, 60, 60]]), xp=[0, 60, 255],
-                               red=[0, 200, 255], green=[0, 100, 255], blue=[0, 50, 255])
-    assert levels(out) == [[200, 100, 50], [200, 100, 50]]
 
 
 def test_uniform_luminance_keeps_alpha_and_missing_pixels():
