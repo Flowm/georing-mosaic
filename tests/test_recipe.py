@@ -92,3 +92,47 @@ def test_the_seviri_table_is_whole_and_makes_bright_cloud_white():
     assert centres.shape == (3, table.shape[1]) and np.isfinite(table).all()
     cloud = colour_from_table(np.array([[[85.0]], [[85.0]], [[40.0]]]), centres, table)[:, 0, 0]
     assert np.ptp(cloud) < 0.1 * cloud.mean()
+
+
+def test_twilight_keeps_the_day_layer_until_the_haze_is_stretched_out():
+    from georing.recipe import twilight
+
+    day, night = np.array([0.5, 0.5, 0.5]), np.array([0.2, 0.2, 0.2])
+    sunz = np.array([70.0, 77.0, 80.0])
+    out = twilight(day, night, sunz, weight=np.ones(3), gain=1.4, offset=51, start=76, end=78)
+    # Untouched before 76 degrees, half stretched at 77, fully from 78 on.
+    np.testing.assert_allclose(out, [0.5, 0.5 * 1.2 - 0.1, 0.5 * 1.4 - 0.2])
+
+
+def test_twilight_mixes_the_layers_as_light():
+    from georing.recipe import twilight
+
+    out = twilight(np.array([1.0]), np.array([0.0]), np.array([84.0]), weight=np.array([0.5]),
+                   gain=1.0, offset=0.0, start=76, end=78)
+    # Half the light of white is brighter than half the display value.
+    np.testing.assert_allclose(out, [0.5 ** (1 / 2.2)])
+    night = twilight(np.array([1.0]), np.array([0.3]), np.array([90.0]), weight=np.array([0.0]),
+                     gain=1.4, offset=51, start=76, end=78)
+    np.testing.assert_allclose(night, [0.3])
+
+
+def test_the_twilight_compositor_stretches_and_blends_by_sun_zenith(monkeypatch):
+    from pyresample.geometry import AreaDefinition
+    from satpy.composites import fill
+
+    from georing.recipe import TwilightCompositor
+
+    monkeypatch.setattr(fill, "enhance2dataset", lambda data, *a, **k: data)  # layers come in enhanced
+    area = AreaDefinition("row", "", "", "EPSG:4326", 3, 1, (0, -0.5, 3, 0.5))
+
+    def layer(values):
+        data = np.array(values, dtype=np.float64).T[:, None, :]
+        return xr.DataArray(da.from_array(data, chunks=(3, 1, 3)), dims=("bands", "y", "x"),
+                            coords={"bands": list("RGB")}, attrs={"area": area})
+
+    sunz = xr.DataArray(np.array([[70.0, 80.0, 90.0]]), dims=("y", "x"), attrs={"area": area})
+    comp = TwilightCompositor("georing", lim_low=82, lim_high=86, gain=(1.0, 1.0, 1.2), offset=(0, 0, 51))
+    out = comp([layer([[0.5] * 3] * 3), layer([[0.1] * 3] * 3), sunz]).values[:, 0, :]
+    np.testing.assert_allclose(out[:, 0], [0.5, 0.5, 0.5])  # full day, before the stretch
+    np.testing.assert_allclose(out[:, 1], [0.5, 0.5, 0.4], atol=1e-6)  # blue stretched: 0.6 - 0.2
+    np.testing.assert_allclose(out[:, 2], [0.1, 0.1, 0.1])  # full night

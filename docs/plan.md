@@ -298,9 +298,13 @@ reading".
 - **The owner's judgement of the Recipe.** The side-by-side images are in
   `work/comparison/georing/` after `georing-compare`, those of the Recipe
   before it was tuned in `work/comparison/baseline-4beb0f0/`. The holdout set
-  says the night changes hold on another day; the terminator, Himawari's sun
-  glint and snow miss their targets. What still differs from CIRA is listed in
-  the notes, under "Recipe".
+  says the night changes and the twilight compositor hold on another day;
+  Himawari's sun glint and snow miss their targets. On 2026-11-15 the owner
+  judged the twilight at 78–84° closest to CIRA's, and named two gaps: low
+  cloud and sea past 84°, which CIRA draws with ProxyVis over the ocean, and
+  the city lights, 3 km and finished on the infrared grid where NASA has them
+  at 500 m. What still differs from CIRA is listed in the notes, under
+  "Recipe".
 - **The references are not kept.** SLIDER holds some weeks, and the copies
   under `work/comparison/reference/` are not in git: they are CIRA's images.
   Decide where the Comparison scenes' references and Disks are to live.

@@ -37,10 +37,20 @@ modifiers:
       - solar_zenith_angle
 
 composites:
+  # Day and night joined across the terminator. From 76 to 78 degrees of sun
+  # zenith the day layer is stretched to 1.2/1.3/1.4 times itself less
+  # 30/45/65 levels (R, G, B): that takes out the blue haze the Rayleigh fade
+  # leaves, so the low-sun sea is dark and cloud shadows are not blue, as in
+  # CIRA's GeoColor. The night layer comes in from 82 to 86 degrees, mixed
+  # as light. Fitted on the twilight scenes, with h-dawn and h-dusk held out.
   georing:
-    compositor: !!python/name:satpy.composites.fill.DayNightCompositor
-    lim_low: 78
-    lim_high: 88
+    compositor: !!python/name:georing.recipe.TwilightCompositor
+    lim_low: 82
+    lim_high: 86
+    stretch_start: 76
+    stretch_end: 78
+    gain: [1.2, 1.3, 1.4]
+    offset: [30, 45, 65]
     standard_name: georing
     prerequisites:
       - georing_day
