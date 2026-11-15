@@ -97,6 +97,11 @@ COMPARISON_SCENES = (
                     "thunderstorms over the Congo basin at midnight"),
     ComparisonScene("storms-east", "meteosat-0", _slot(10, 18), (28, -12, 42, 2),
                     "thunderstorms over Tanzania and Lake Victoria by night"),
+    # Bright cloud under a low midday sun: in November the sun stands 74 to 86
+    # degrees from the zenith here for hours, where the twilight scenes are
+    # mostly dark sea at dusk.
+    ComparisonScene("lowsun", "goes-west", _slot(15, 19), (-170, 38, -130, 58),
+                    "the North Pacific under a low midday sun"),
     ComparisonScene("day-seviri", "meteosat-iodc", _slot(10, 6), (68, 8, 84, 26),
                     "India before noon: the made-up blue and green over land"),
     ComparisonScene("snow-seviri", "meteosat-iodc", _slot(10, 6), (70, 30, 84, 38),
@@ -122,6 +127,8 @@ COMPARISON_SCENES = (
                     "snow on the Andes at the end of winter", "holdout"),
     ComparisonScene("h-glint", "himawari", _slot(14, 22, 9), (162, -4, 179, 12),
                     "the sun's reflection on the central Pacific", "holdout"),
+    ComparisonScene("h-lowsun", "meteosat-0", _slot(14, 13), (-40, 45, -5, 62),
+                    "the North Atlantic under a low midday sun", "holdout"),
     # SLIDER no longer held Meteosat-9 for 14 September when it was added.
     ComparisonScene("h-day-seviri", "meteosat-iodc", _slot(1, 7, 10), (44, 14, 59, 28),
                     "Arabia and Oman before noon: desert and the Arabian Sea", "holdout"),

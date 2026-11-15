@@ -71,11 +71,12 @@ def twilight(day, night, sunz, weight, gain, offset, start, end, gamma=2.2):
     ``day`` and ``night`` are display values from 0 to 1, ``sunz`` the sun
     zenith in degrees and ``weight`` the day layer's share of the blend.
     From ``start`` to ``end`` degrees the day layer's contrast is stretched
-    in: multiplied by ``gain`` less ``offset`` (on 0 to 255), held beyond.
-    The layers are then mixed as light, decoded with ``gamma``, so neither
-    greys the other where they overlap.
+    in, on a smooth step: multiplied by ``gain`` less ``offset`` (on 0 to
+    255), held beyond. The layers are then mixed as light, decoded with
+    ``gamma``, so neither greys the other where they overlap.
     """
-    ramp = ((sunz - start) / (end - start)).clip(0, 1)
+    t = ((sunz - start) / (end - start)).clip(0, 1)
+    ramp = t * t * (3 - 2 * t)
     day = ((1 + (gain - 1) * ramp) * day - offset / 255 * ramp).clip(0, 1)
     night = night.clip(0, 1)
     return (weight * day**gamma + (1 - weight) * night**gamma) ** (1 / gamma)

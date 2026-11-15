@@ -90,10 +90,11 @@ def test_twilight_keeps_the_day_layer_until_the_haze_is_stretched_out():
     from georing.recipe import twilight
 
     day, night = np.array([0.5, 0.5, 0.5]), np.array([0.2, 0.2, 0.2])
-    sunz = np.array([70.0, 77.0, 80.0])
-    out = twilight(day, night, sunz, weight=np.ones(3), gain=1.4, offset=51, start=76, end=78)
-    # Untouched before 76 degrees, half stretched at 77, fully from 78 on.
-    np.testing.assert_allclose(out, [0.5, 0.5 * 1.2 - 0.1, 0.5 * 1.4 - 0.2])
+    sunz = np.array([70.0, 76.5, 77.0, 80.0])
+    out = twilight(day.repeat(4)[:4], night.repeat(4)[:4], sunz, weight=np.ones(4), gain=1.4, offset=51, start=76, end=78)
+    # Untouched before 76 degrees, then in on a smooth step: 0.156 of the way
+    # at a quarter, half at 77, fully from 78 on, so no edge shows.
+    np.testing.assert_allclose(out, [0.5, 0.5 * (1 + 0.4 * 0.15625) - 0.2 * 0.15625, 0.5 * 1.2 - 0.1, 0.5 * 1.4 - 0.2])
 
 
 def test_twilight_mixes_the_layers_as_light():

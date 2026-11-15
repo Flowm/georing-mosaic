@@ -62,7 +62,16 @@ buckets are in `us-east-1` and allow anonymous access.
 - Channels: VIS006, VIS008 and IR_016 by day, IR_039 and IR_108 by night, at
   3 km; HRV at 1 km over part of the disk. There is no blue or green band.
 - The spacecraft is in an inclined orbit: on 2026-11-10 at 06:00 it was 7.1°N
-  of the equator, at 46.1°E. Level 1.5 data is on the nominal 45.5°E grid.
+  of the equator, at 46.1°E; on 2026-11-15 at 18:00 6.5°S, at 46.1°E. Level
+  1.5 data is on the nominal 45.5°E grid, as if seen from the equator, so
+  the rim of that grid away from the satellite is not scanned: at 18:00 on
+  2026-11-15, 0.9% of the nominal disk's pixels, a ring at the limb from
+  81°S to 81°N, missing in every band. The Rendering fills them with the
+  static night ground and lights, and the Mosaic keeps them up to its 85°
+  limit, which it works out from the nominal position: over Siberia a dark
+  lens with lights in it, and beside it a strip seen at more than 85° whose
+  infrared reads cold and white. The orbital parameters satpy gives
+  (`satellite_actual_latitude` and so on) hold the true position.
 - The Data Store's other SEVIRI collection, `EO:EUM:DAT:MSG:HRSEVIRI`, is
   Meteosat-10 at 0°, on the same 15-minute cycle.
 
@@ -254,31 +263,33 @@ now.
 |---|---|---|---|---|---|---|
 | day | tuning | GOES-East, 18:00 | Florida, Cuba, the Bahamas | 10, 15, 17 | 4, 6, 5 | 3, 4, 4 |
 | night | tuning | GOES-East, 06:00 | the eastern United States | 27, 23, 26 | 25, 22, 23 | 7, 5, 4 |
-| terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 7, 8, 11 |
+| terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 6, 8, 11 |
 | glint | tuning | GOES-West, 18:00 | the Pacific at 9°S 115°W | 9, 15, 18 | 2, 3, 3 | 1, 2, 1 |
-| snow | tuning | Himawari, 06:00 | Mongolia and Lake Baikal | 16, 16, 19 | 8, 10, 13 | 6, 8, 11 |
+| snow | tuning | Himawari, 06:00 | Mongolia and Lake Baikal | 16, 16, 19 | 8, 10, 13 | 5, 8, 11 |
 | dust | tuning | Meteosat, 11:00 | the Sahara around Lake Chad | 15, 13, 18 | 3, 4, 6 | 0, 2, 4 |
 | day-ahi | tuning | Himawari, 06:00 | Australia and the Coral Sea | 9, 11, 13 | 3, 5, 5 | 1, 3, 3 |
 | day-fci | tuning | Meteosat, 11:00 | the Gulf of Guinea and central Africa | 14, 17, 23 | 3, 5, 5 | 0, 2, 2 |
 | night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 2, 1, 1 |
-| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 8, 8, 9 |
+| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 8, 9, 10 |
 | glint-ahi | tuning | Himawari, 02:00 | around New Guinea | 7, 8, 9 | 3, 4, 6 | 2, 2, 4 |
 | storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 1, 1, 1 |
 | storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 3, 2, 2 |
-| h-day-ahi | holdout | Himawari, 03:00 | Borneo, Java and Sulawesi | 8, 10, 10 | 3, 7, 8 | 1, 5, 5 |
-| h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 0, 3, 6 |
+| h-day-ahi | holdout | Himawari, 03:00 | Borneo, Java and Sulawesi | 8, 10, 10 | 3, 7, 8 | 1, 5, 5 (reference lost) |
+| h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 0, 3, 6 (reference lost) |
 | h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 3, 4, 4 |
-| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 3, 2, 2 |
-| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 8, 12, 15 |
-| h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 5, 5, 7 |
+| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 3, 2, 2 (reference lost) |
+| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 8, 12, 15 (reference lost) |
+| h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 4, 4, 4 |
 | h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 2, 6, 4 |
-| h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 4, 7, 8 |
+| h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 4, 7, 8 (reference lost) |
 | day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 27, 23, 14 |
 | snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 28, 22, 17 |
 | dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 11, 13 |
 | night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 21, 25 |
 | h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 17, 10, 17 |
 | h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 4 |
+| lowsun | tuning | GOES-West, 19:00 (2026-11-15) | the North Pacific under a low midday sun | – | – | 7, 9, 10 |
+| h-lowsun | holdout | Meteosat, 13:00 (2026-11-14) | the North Atlantic under a low midday sun | – | – | 8, 12, 17 |
 
 Exact figures are in `difference.json` beside the images. satpy has no
 `geo_color` for SEVIRI, and Meteosat-9's scenes were added after the tuning,
@@ -295,8 +306,17 @@ the Rendering was cropped to the scene's longitudes and latitudes, which fell
 to every figure, and the storm figures above include it. The Recipe column
 is measured without it, on 2026-11-14 (the twilight scenes on 2026-11-15
 with the twilight compositor, the night scenes, storms, dawn and h-dawn on
-2026-11-15 with the new city lights); the `geo_color` and before-tuning
-columns are not re-measured and still include it.
+2026-11-15 with the new city lights, the low-sun scenes, snow and the
+twilight scenes again on 2026-11-15 with the wider stretch); the `geo_color`
+and before-tuning columns are not re-measured and still include it.
+The low-sun scenes were added on 2026-11-15, after the twilight stretch
+whitened cloud where the sun stays at 74–86° around midday, which the
+twilight scenes (mostly dark sea at dusk) had not shown.
+On 2026-11-15 the local `work/` directory was deleted. The references of
+h-day-ahi, h-dawn and h-glint (Himawari) and of h-day-fci and h-night-warm
+(Meteosat) are lost with it: SLIDER no longer held 2026-09-14 for those two
+satellites. Their figures stand as last measured and can no longer be
+measured again. Every other reference was still on SLIDER that day.
 Over the water of the Great Bahama Bank (79.5–77.5°W, 23–25.5°N) the day
 scene's mean colour is 44, 84, 105 against CIRA's 43, 90, 107; before tuning
 it was 44, 81, 106.
@@ -317,16 +337,28 @@ What the Recipe changes from `geo_color`:
   terminator scenes.
 - **Twilight: the day layer's haze stretched out, the layers mixed as
   light** (`georing.recipe.TwilightCompositor`, replacing satpy's
-  day/night compositor). From 76° to 78° of sun zenith the day layer is
-  stretched to 1.2, 1.3 and 1.4 times itself less 30, 45 and 65 levels (R,
-  G, B), held beyond: that takes out the blue haze the Rayleigh fade leaves,
-  the milky veil over dark sea and the blue in cloud shadows. The night layer
-  comes in from 82° to 86°, mixed as light (gamma 2.2), where satpy blends
-  78° to 88° on display values. Rendered on 2026-11-15: terminator 9.0 to
-  8.6, dawn 10.6 to 8.5, dusk-seviri 11.8 to 11.3, holdout h-dawn 13.3 to
-  11.1, h-dusk 5.3 unchanged; snow, the only other scene that reaches 76°,
-  unchanged. The real renders match the offline model within 0.3. How it
-  was found is under "The terminator" below.
+  day/night compositor). From 72° to 82° of sun zenith, on a smooth step,
+  the day layer is stretched to 1.16, 1.24 and 1.32 times itself less 24, 36
+  and 52 levels (R, G, B), held beyond: that takes out the blue haze the
+  Rayleigh fade leaves, the milky veil over dark sea and the blue in cloud
+  shadows. The night layer comes in from 82° to 86°, mixed as light (gamma
+  2.2), where satpy blends 78° to 88° on display values.
+  First built on 2026-11-15 at full strength (1.2/1.3/1.4 less 30/45/65)
+  over 76–78°: terminator 9.0 to 8.6, dawn 10.6 to 8.5, dusk-seviri 11.8 to
+  11.3, holdout h-dawn 13.3 to 11.1. In the first Mosaics it pushed bright
+  cloud past white, blue first, and drew an edge across cloud fields where
+  the November sun stays at 74–86° around midday (the North Pacific, the
+  Southern Ocean). Over bright cloud on lowsun it rose from 192 to 210
+  between 75° and 78° where CIRA rises from 197 to 204, then stayed 20 below
+  CIRA at 83–85°. A black point that keeps white white (tried at 0.06–0.14,
+  0.1–0.18, 0.14–0.26) took the edge out but left low-sun cloud 10 darker
+  than CIRA, which does whiten it; highlights rolled softly into white, and a
+  later blend (83–87, 84–88), did not help. The wider, milder, smooth ramp,
+  rendered on 2026-11-15: terminator 8.4 to 8.2, dawn 8.3 to 8.8,
+  dusk-seviri 11.2 to 11.3, lowsun 9.1 to 8.7, snow 8.0 to 7.9; holdout h-dusk
+  3.7 to 3.6, h-lowsun 13.1 to 12.4. Over bright cloud its gap to CIRA on
+  lowsun fell from 8.4 to 6.7, and no edge shows. How the stretch was found
+  is under "The terminator" below.
 - **Rayleigh correction fades out toward the terminator,** from full at a sun
   angle of 70° to a tenth at 88°. At full strength it takes out more blue than
   a low sun puts in, and dusk turns olive.
@@ -399,9 +431,10 @@ What the Recipe changes from `geo_color`:
   purple.
 
 What still differs from CIRA:
-- **The terminator.** With the twilight compositor and the new city lights:
-  terminator 8.6, dawn 8.3, dusk-seviri 11.3, holdout h-dawn 11.4 (blue
-  worst, 15), h-dusk 5.3.
+- **The terminator.** With the twilight compositor, its wider stretch and the
+  new city lights: terminator 8.2, dawn 8.8, dusk-seviri 11.3, lowsun 8.7;
+  holdout h-dusk 3.6, h-lowsun 12.4 (blue worst, 17: CIRA's low-sun cloud
+  is bluer than ours).
   What is left: past 84° CIRA's night sea is dark teal with grey low cloud
   where ours is black (ProxyVis, below); Meteosat-12 would take a milder blue
   stretch than GOES and Himawari; ours is short of blue over clear sea at

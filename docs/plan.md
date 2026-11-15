@@ -312,7 +312,17 @@ reading".
   listed in the notes, under "Recipe".
 - **The references are not kept.** SLIDER holds some weeks, and the copies
   under `work/comparison/reference/` are not in git: they are CIRA's images.
-  Decide where the Comparison scenes' references and Disks are to live.
+  On 2026-11-15 the local `work/` was deleted and five holdout references
+  (2026-09-14, Himawari and Meteosat) were lost for good; the others can
+  still be fetched again, for some weeks. Decide where the Comparison
+  scenes' references and Disks are to live.
+- **Meteosat-9's true position.** Its orbit is inclined (6.5°S on
+  2026-11-15 at 18:00), but the Mosaic works out view angles from its
+  nominal position on the equator. So it keeps an unscanned rim filled with
+  night lights (a dark lens over Siberia at 18:00) and a strip seen at more
+  than 85°, and places the Seam with its neighbours from the wrong angles.
+  The Rendering could carry the satellite's actual position for the join
+  (the notes, under "Meteosat IODC").
 - **The two sides of a Seam differ in colour.** The 5° feather turns the line
   into a gradient; the difference itself remains. Off Brazil at 18:00
   Meteosat's side of the sea is grey-beige and GOES-East's blue; at the date
