@@ -151,6 +151,17 @@ class Window:
             self.left + self.col * self.metres, self.top - self.row * self.metres, self.metres, self.metres
         )
 
+    def bounds(self, margin: int = 0) -> tuple[float, float, float, float]:
+        """Return the window's west, south, east, north in projection metres.
+
+        ``margin`` widens it by that many of its pixels on every side.
+        """
+        west = self.left + (self.col - margin) * self.metres
+        north = self.top - (self.row - margin) * self.metres
+        size = 2 * margin
+        return (west, north - (self.height + size) * self.metres,
+                west + (self.width + size) * self.metres, north)
+
 
 def window(scene: ComparisonScene, disk_area) -> Window:
     """Return where ``scene`` lies in SLIDER's grid of the Disk with ``disk_area``."""
@@ -243,7 +254,10 @@ def ours(scene: ComparisonScene, recipe: str, work: Path, secrets: dict[str, str
 
     scn = load_recipe(scene.position, str(disk_dir), str(work / "grids"), recipe)
     win = window(scene, scn.finest_area())
-    crop = scn.crop(ll_bbox=scene.bbox)
+    # Crop to the window itself, with a margin. Cropped to the scene's
+    # longitudes and latitudes, the Rendering fell 3 to 10 km short of it on
+    # every side and left a black frame that counted in every figure.
+    crop = scn.crop(xy_bbox=win.bounds(margin=4))
     native = crop.resample(crop.finest_area(), resampler="native")
     tif = Path(os.environ.get("TMPDIR", work / "comparison" / "tmp")) / f"{scene.name}.tif"
     native.save_dataset(recipe, filename=str(tif), writer="geotiff")

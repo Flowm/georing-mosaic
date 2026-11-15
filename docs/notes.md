@@ -208,33 +208,33 @@ now.
 
 | Scene | Set | Satellite, UTC | Place | `geo_color` | Before tuning | Recipe |
 |---|---|---|---|---|---|---|
-| day | tuning | GOES-East, 18:00 | Florida, Cuba, the Bahamas | 10, 15, 17 | 4, 6, 5 | 4, 6, 5 |
-| night | tuning | GOES-East, 06:00 | the eastern United States | 27, 23, 26 | 25, 22, 23 | 8, 6, 7 |
-| terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 9, 10, 12 |
-| glint | tuning | GOES-West, 18:00 | the Pacific at 9°S 115°W | 9, 15, 18 | 2, 3, 3 | 2, 3, 3 |
-| snow | tuning | Himawari, 06:00 | Mongolia and Lake Baikal | 16, 16, 19 | 8, 10, 13 | 7, 9, 12 |
-| dust | tuning | Meteosat, 11:00 | the Sahara around Lake Chad | 15, 13, 18 | 3, 4, 6 | 3, 4, 5 |
-| day-ahi | tuning | Himawari, 06:00 | Australia and the Coral Sea | 9, 11, 13 | 3, 5, 5 | 2, 4, 5 |
-| day-fci | tuning | Meteosat, 11:00 | the Gulf of Guinea and central Africa | 14, 17, 23 | 3, 5, 5 | 3, 5, 5 |
-| night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 3, 3, 3 |
-| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 11, 11, 12 |
-| glint-ahi | tuning | Himawari, 02:00 | around New Guinea | 7, 8, 9 | 3, 4, 6 | 3, 4, 5 |
-| storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 4, 4, 7 |
-| storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 3, 3, 4 |
-| h-day-ahi | holdout | Himawari, 03:00 | Borneo, Java and Sulawesi | 8, 10, 10 | 3, 7, 8 | 2, 6, 7 |
-| h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 2, 4, 8 |
-| h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 5, 6, 6 |
-| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 4, 4, 4 |
-| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 12, 16, 18 |
-| h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 6, 6, 8 |
-| h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 3, 7, 4 |
-| h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 6, 9, 10 |
-| day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 28, 24, 15 |
-| snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 29, 22, 18 |
-| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 10, 12, 15 |
+| day | tuning | GOES-East, 18:00 | Florida, Cuba, the Bahamas | 10, 15, 17 | 4, 6, 5 | 3, 4, 4 |
+| night | tuning | GOES-East, 06:00 | the eastern United States | 27, 23, 26 | 25, 22, 23 | 7, 6, 6 |
+| terminator | tuning | Meteosat, 18:00 | West Africa and the Atlantic at dusk | 16, 26, 44 | 10, 13, 18 | 8, 9, 11 |
+| glint | tuning | GOES-West, 18:00 | the Pacific at 9°S 115°W | 9, 15, 18 | 2, 3, 3 | 1, 2, 1 |
+| snow | tuning | Himawari, 06:00 | Mongolia and Lake Baikal | 16, 16, 19 | 8, 10, 13 | 6, 8, 11 |
+| dust | tuning | Meteosat, 11:00 | the Sahara around Lake Chad | 15, 13, 18 | 3, 4, 6 | 0, 2, 4 |
+| day-ahi | tuning | Himawari, 06:00 | Australia and the Coral Sea | 9, 11, 13 | 3, 5, 5 | 1, 3, 3 |
+| day-fci | tuning | Meteosat, 11:00 | the Gulf of Guinea and central Africa | 14, 17, 23 | 3, 5, 5 | 0, 2, 2 |
+| night-warm | tuning | Meteosat, 00:00 | the Sahara and the Sahel | 30, 37, 43 | 35, 45, 56 | 1, 1, 1 |
+| dawn | tuning | GOES-East, 11:00 | the Caribbean and Venezuela | 11, 19, 25 | 16, 13, 15 | 11, 10, 11 |
+| glint-ahi | tuning | Himawari, 02:00 | around New Guinea | 7, 8, 9 | 3, 4, 6 | 2, 2, 4 |
+| storms | tuning | Meteosat, 00:00 | thunderstorms over the Congo basin | 35, 29, 39 | – | 3, 2, 5 |
+| storms-east | tuning | Meteosat, 18:00 | thunderstorms over Tanzania and Lake Victoria | 23, 20, 24 | – | 2, 2, 2 |
+| h-day-ahi | holdout | Himawari, 03:00 | Borneo, Java and Sulawesi | 8, 10, 10 | 3, 7, 8 | 1, 5, 5 |
+| h-day-fci | holdout | Meteosat, 12:00 | Iberia, Morocco, the western Mediterranean | 10, 11, 26 | 2, 5, 8 | 0, 3, 6 |
+| h-night-cold | holdout | GOES-East, 08:00 | the Pampas at the end of winter | 39, 36, 41 | 36, 37, 40 | 4, 4, 4 |
+| h-night-warm | holdout | Meteosat, 01:00 | Libya and Egypt | 22, 27, 31 | 26, 34, 42 | 3, 3, 3 |
+| h-dawn | holdout | Himawari, 22:00 | Korea, Japan, the East China Sea | 18, 22, 26 | 17, 20, 23 | 11, 14, 17 |
+| h-dusk | holdout | GOES-East, 22:00 | Brazil and Bolivia | 20, 14, 24 | 13, 13, 17 | 5, 5, 7 |
+| h-snow | holdout | GOES-East, 15:00 | the Andes at the end of winter | 8, 7, 16 | 3, 9, 4 | 2, 6, 4 |
+| h-glint | holdout | Himawari, 22:00 | the central Pacific near 4°N 170°E | 13, 17, 22 | 6, 9, 10 | 4, 7, 8 |
+| day-seviri | tuning | Meteosat-9, 06:00 | India before noon | – | – | 27, 23, 14 |
+| snow-seviri | tuning | Meteosat-9, 06:00 | the Karakoram, the Himalaya and Tibet | – | – | 28, 22, 17 |
+| dusk-seviri | tuning | Meteosat-9, 13:00 | the Arabian Sea and southern India at dusk | – | – | 9, 11, 15 |
 | night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 22, 26 |
-| h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 19, 11, 18 |
-| h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 6 |
+| h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 17, 10, 17 |
+| h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 5 |
 
 Exact figures are in `difference.json` beside the images. satpy has no
 `geo_color` for SEVIRI, and Meteosat-9's scenes were added after the tuning,
@@ -245,11 +245,12 @@ for 12:00 on 2026-11-10. The storm scenes were added during the tuning; before t
 layer's ramp was changed, they were 17.5, 18.1, 17.4 and 12.7, 12.9, 12.2,
 and before it was fitted to CIRA's storm tops on 2026-11-14 (see the
 infrared cloud layer below), 6.2, 6.0, 8.0 and 4.8, 4.8, 4.9.
-On our side of each pair a frame 3 to 7 px wide is black, where the
-Rendering, cropped to the scene's bounds, stops short of SLIDER's rectangle
-around them (seen on the storm scenes, 2026-11-14). It adds 1 to 2 levels to
-every figure; without it storms is 2.6, 1.9, 5.3 and storms-east 1.8, 1.6,
-2.1.
+Until 2026-11-14 our side of each pair had a black frame 3 to 7 px wide:
+the Rendering was cropped to the scene's longitudes and latitudes, which fell
+3 to 10 km short of SLIDER's rectangle around them. It added 1 to 2 levels
+to every figure, and the storm figures above include it. The Recipe column
+is measured without it, on 2026-11-14; the `geo_color` and before-tuning
+columns are not re-measured and still include it.
 Over the water of the Great Bahama Bank (79.5–77.5°W, 23–25.5°N) the day
 scene's mean colour is 44, 84, 105 against CIRA's 43, 90, 107; before tuning
 it was 44, 81, 106.
