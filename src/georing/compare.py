@@ -102,6 +102,11 @@ COMPARISON_SCENES = (
     # mostly dark sea at dusk.
     ComparisonScene("lowsun", "goes-west", _slot(15, 19), (-170, 38, -130, 58),
                     "the North Pacific under a low midday sun"),
+    # A limb at twilight: MTG-I1 sees the Indian Ocean 60 to 80 degrees off
+    # vertical as the sun rises on it, and the bands, divided by a low sun,
+    # burnt it out to white.
+    ComparisonScene("limb-dawn", "meteosat-0", _slot(16, 2), (40, -45, 62, 5),
+                    "MTG-I1's eastern limb at dawn over the Indian Ocean"),
     ComparisonScene("day-seviri", "meteosat-iodc", _slot(10, 6), (68, 8, 84, 26),
                     "India before noon: the made-up blue and green over land"),
     ComparisonScene("snow-seviri", "meteosat-iodc", _slot(10, 6), (70, 30, 84, 38),
@@ -129,6 +134,8 @@ COMPARISON_SCENES = (
                     "the sun's reflection on the central Pacific", "holdout"),
     ComparisonScene("h-lowsun", "meteosat-0", _slot(14, 13), (-40, 45, -5, 62),
                     "the North Atlantic under a low midday sun", "holdout"),
+    ComparisonScene("h-limb-dusk", "meteosat-0", _slot(14, 21), (-68, -40, -45, 5),
+                    "MTG-I1's western limb at dusk over Brazil and the South Atlantic", "holdout"),
     # SLIDER no longer held Meteosat-9 for 14 September when it was added.
     ComparisonScene("h-day-seviri", "meteosat-iodc", _slot(1, 7, 10), (44, 14, 59, 28),
                     "Arabia and Oman before noon: desert and the Arabian Sea", "holdout"),

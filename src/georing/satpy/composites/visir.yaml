@@ -54,10 +54,14 @@ composites:
     stretch_end: 82
     gain: [1.16, 1.24, 1.32]
     offset: [24, 36, 52]
+    glare_sun: [65, 72]
+    glare_angle: [20, 40]
     standard_name: georing
     prerequisites:
       - georing_day
       - georing_night
+    optional_prerequisites:
+      - georing_land_water_mask
 
   # The clouds over the city lights. The clouds are put together on the
   # infrared grid, where they are made, and come up to the finest grid as one

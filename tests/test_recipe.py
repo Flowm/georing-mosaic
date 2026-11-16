@@ -156,3 +156,21 @@ def test_the_grey_is_divided_by_a_sun_no_lower_than_its_cap():
 
     out = capped_sun_correction(np.array([25.0, 25.0]), np.array([60.0, 80.0]), 70.0)
     np.testing.assert_allclose(out, [50.0, 25.0 / np.cos(np.radians(70.0))])
+
+
+def test_the_glint_angle_is_zero_looking_into_the_suns_reflection():
+    from georing.recipe import glint_angle
+
+    out = glint_angle(np.array([60.0, 60.0, 0.0]), np.array([60.0, 60.0, 0.0]),
+                      np.array([90.0, 90.0, 0.0]), np.array([270.0, 90.0, 0.0]))
+    # Sun in the east, satellite as low in the west; on the same side; both overhead.
+    np.testing.assert_allclose(out, [0.0, 120.0, 0.0], atol=1e-4)
+
+
+def test_a_low_sun_glares_where_the_view_is_near_its_reflection():
+    from georing.recipe import glare
+
+    out = glare(np.array([60.0, 70.0, 80.0, 80.0, 80.0]), np.array([10.0, 10.0, 10.0, 30.0, 50.0]),
+                sun=(65, 75), angle=(20, 40))
+    # A high sun; halfway down; low; low but further off; low and far off.
+    np.testing.assert_allclose(out, [0.0, 0.5, 1.0, 0.5, 0.0])

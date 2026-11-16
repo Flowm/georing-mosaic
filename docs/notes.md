@@ -373,6 +373,37 @@ What the Recipe changes from `geo_color`:
   3.7 to 3.6, h-lowsun 13.1 to 12.4. Over bright cloud its gap to CIRA on
   lowsun fell from 8.4 to 6.7, and no edge shows. How the stretch was found
   is under "The terminator" below.
+- **Glare on a limb at twilight gives way to the night layer**
+  (`glare_sun`, `glare_angle` on `georing`). Where a satellite looks into a
+  low sun's reflection over the sea, the day layer burnt out to white: the
+  02:00 Slot on 2026-11-16 showed a white stripe from MTG-I1's eastern limb
+  down to the Southern Ocean, cut off where Meteosat-9 takes over at 62°E.
+  There MTG-I1 sees the sea 70–78° off vertical under a sun of 72–84°, and its
+  raw red reads 58–107% where Meteosat-9, seeing the same sea at 33°, reads
+  3.5–4%: 10 to 25 times as bright, with the glint angle (between the view
+  and the sun's mirror image) under 30°. Divided by the sun it reached 250 to
+  450%, and satpy's Rayleigh correction, which takes a red band above 20% for
+  cloud and is relaxed to nothing at 100%, left it all in. pyspectral's
+  Rayleigh table puts only 15–27% of red there; the rest is the sea's
+  reflection and forward scatter, nothing of the ground. So the day layer's
+  share falls, times the water fraction of the land mask, as the sun goes
+  from 65° to 72° and the glint angle from 40° to 20°. Burnt-out pixels on
+  limb-dawn went from 10% to 0.02%. Over land the same fade swapped daylit
+  cloud over Bolivia for the night layer at MTG-I1's western limb on
+  2026-11-15 21:00, where CIRA and ours showed cloud by day, hence the water
+  only. The sea beyond the coast still goes to night, a hard step at the
+  coastline off Argentina on h-limb-dusk (2026-11-14 21:00); the Mosaic
+  takes GOES-East there. Against CIRA, which burns its limbs out as ours
+  did, limb-dawn went from 5.8, 5.8, 5.9 to 25.2, 25.1, 24.5 and h-limb-dusk
+  from 6.3, 6.8, 7.1 to 11.9, 12.4, 12.6 (burnt-out pixels 10.7% to 8.3%,
+  CIRA's 11.8%). The other 16
+  scenes rendered with it on and off (every one with a low sun or glint) are
+  the same to the pixel. A rim of white stays at the very edge, beyond 80° of
+  view and under a sun higher than 65°; the Mosaic takes another satellite
+  there. The 02:00 Slot built again with it: the stripe is grey cloud and
+  dark sea, burnt-out pixels between 15°E and 100°E fell from 8.9% to 1.6%
+  (most of the rest Antarctic ice, which is land and white), and the largest
+  render peaked at 22.8 GB, the Slot taking 26 minutes.
 - **Rayleigh correction fades out toward the terminator,** from full at a sun
   angle of 70° to a tenth at 88°. At full strength it takes out more blue than
   a low sun puts in, and dusk turns olive.

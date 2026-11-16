@@ -52,7 +52,10 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   GeoColor ([Miller et al.
   2020](https://journals.ametsoc.org/view/journals/atot/37/3/JTECH-D-19-0134.1.xml))
   on the tuning set of Comparison scenes and checked on the holdout set. What
-  it changes and what is left is in the notes, under "Recipe". The owner
+  it changes and what is left is in the notes, under "Recipe". It departs
+  from CIRA on purpose in one place: where a satellite looks into a low sun's
+  reflection over the sea, along its limb at dawn or dusk, CIRA's day layer
+  burns out to white and ours gives way to the night layer. The owner
   judges when it is close enough; that judgement is open.
 - **Meteosat-9's day colour** is looked up in a table of the colour MTG-I1
   shows for each combination of SEVIRI's red, 0.8 µm and 1.6 µm bands, made
