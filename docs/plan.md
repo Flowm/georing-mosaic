@@ -111,7 +111,11 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   for about one Slot in ten; it was built first and taken out, because it
   was the most delicate path in the flow and made a rebuilt Mosaic from
   lossy copies. A rebuild replaces a Mosaic only by a better one: a rebuild
-  that would lose a Disk, or add none, publishes nothing. Imagery from
+  that would lose a Disk, or add none, publishes nothing. It fetches the
+  Disks the Mosaic lacks first and stops if none of them can be had, before
+  downloading and rendering the others: in the EUMETSAT outage of
+  2026-11-17/18 every rebuild took 24–30 minutes to find that out, and each
+  pushed the next Slot of the hour back by up to 40 minutes. Imagery from
   another Slot is never used as a stand-in, and that includes the same
   satellite's scan at 10 minutes past: a possible later addition for GOES and
   Himawari, ruled out for Meteosat by ADR 0002.
@@ -154,11 +158,15 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   catch-up queue. A backfill tries again. A source that cannot be asked is
   asked again next hour and does not fail the run. The sources are asked in a
   step of its own, under the time limit, and never from the flow's own
-  process.
+  process. The setting `rebuild_late` (`GEORING_REBUILD_LATE=false`) turns
+  the looking back off, for a source's outage; a backfill then fetches what
+  is lacking.
 - **One flow run at a time:** the worker starts with `--limit 1`.
 - **Catching up never holds up the Slot of the hour.** Rebuilds and backfilled
   Slots wait in a work queue of their own, `catch-up`, which the worker serves
-  after the default one. A run that has started is not interrupted.
+  after the default one. A run that has started is not interrupted, so a
+  long rebuild still delays the next Slot; a rebuild that adds nothing now
+  ends after its first downloads.
 - **Backfill:** the command `georing-backfill START [END]`, run in the worker
   container, queues a run of `georing-slot/hourly` for every Slot in that time
   that is not done or lacks a Disk, newest first, in the catch-up queue. With

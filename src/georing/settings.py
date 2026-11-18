@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     # render peaks at 22 GB, each of the others at 12. One fits 8 CPUs and
     # 32 GB; two want 16 CPUs and 64 GB.
     parallel_renders: int = Field(default=1, ge=1)
+    # Whether the run of the hour queues rebuilds of earlier Slots that lack a
+    # Disk its source now holds. Off, a lacking Disk stays lacking until a
+    # backfill asks for it: during a source's outage, say.
+    rebuild_late: bool = True
 
     @field_validator("satellite_set")
     @classmethod

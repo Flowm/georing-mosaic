@@ -95,6 +95,7 @@ that matter most:
 | `GEORING_OUTPUT_URL` | where products go: empty for `./out`, or `s3://bucket/prefix` |
 | `GEORING_S3_ENDPOINT_URL`, `GEORING_S3_ACCESS_KEY_ID`, `GEORING_S3_SECRET_ACCESS_KEY` | the bucket, on AWS or a service that speaks S3, such as Cloudflare R2 |
 | `GEORING_PARALLEL_RENDERS` | renders at once; two want 16 CPUs and 64 GB |
+| `GEORING_REBUILD_LATE` | `false` stops the run of the hour from rebuilding earlier Slots that lack a Disk; `georing-backfill` still does |
 
 Every other setting, with its default and its meaning, is in
 [src/georing/settings.py](src/georing/settings.py). Each can be set as

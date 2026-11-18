@@ -157,7 +157,8 @@ def test_a_rebuild_that_adds_no_disk_leaves_the_mosaic_as_it_is(steps, tmp_path)
     result = flow.build_slot(SLOT)       # Meteosat is still not there
 
     assert result["built"] is False and result["disks"] == ["goes-east", "goes-west", "himawari", "meteosat-iodc"]
-    assert "mosaic join" not in steps["steps"]
+    # Only the lacking Disk is asked for: nothing else is downloaded or rendered.
+    assert steps["steps"] == ["download meteosat-0"]
 
 def test_a_slot_with_no_disk_at_all_fails(steps):
     steps["unavailable"] = set(ALL)
@@ -415,6 +416,17 @@ def test_the_run_of_the_hour_queues_slots_that_lack_a_disk_or_were_never_built(s
     assert {c["work_queue_name"] for c in queued} == {"catch-up"}
     assert {c["as_subflow"] for c in queued} == {False}  # cancelling this run leaves them queued
     assert sorted(c["flow_run_name"] for c in queued) == ["georing-slot-20261110T1600Z", "georing-slot-20261110T1700Z"]
+
+
+def test_with_rebuilds_turned_off_the_run_of_the_hour_does_not_look_back(steps, queued, hourly, monkeypatch):
+    steps["unavailable"] = {"himawari"}
+    flow.build_slot(at(17))                                      # built without a Disk
+    steps["unavailable"] = set()
+    monkeypatch.setenv("GEORING_REBUILD_LATE", "false")
+    settings.cache_clear()
+
+    assert flow.build_slot()["built"]
+    assert queued == [] and "late disks" not in steps["steps"]
 
 
 def test_without_its_key_the_data_store_is_not_asked(steps, queued, hourly, monkeypatch):

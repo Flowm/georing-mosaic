@@ -303,7 +303,7 @@ def build_slot(slot: datetime | None = None, force: bool = False) -> dict:
         raise RuntimeError(f"No Disk could be had for Slot {stamp(slot)}")
     disks, indexed = built
     # Only the run of the hour looks back; a rebuild would queue the same again.
-    if hourly and runtime.deployment.id:
+    if hourly and runtime.deployment.id and cfg.rebuild_late:
         try:
             _queue_rebuilds(slot)
         except Exception as failure:  # noqa: BLE001 (the store, a source or Prefect, whatever it raises)
@@ -341,10 +341,27 @@ def _build(
     """
     log = get_run_logger()
     deadline = slot + DEADLINE
-    downloads = {
-        download.with_options(task_run_name=f"download-{p}").submit(p, slot, str(scratch), deadline): p
-        for p in cfg.satellite_set
-    }
+
+    def fetch(positions: list[str]) -> dict:
+        return {
+            download.with_options(task_run_name=f"download-{p}").submit(p, slot, str(scratch), deadline): p
+            for p in positions
+        }
+
+    # A rebuild first fetches the Disks its Mosaic lacks. If none can be had
+    # it stops there, before downloading and rendering the Disks it has: a
+    # source that is down must not cost a run of half an hour every hour.
+    arrived: list[str] = []
+    lacking = [p for p in cfg.satellite_set if p not in previous] if previous and not force else []
+    for finished, position in fetch(lacking).items():
+        if isinstance(outcome := finished.result(raise_on_failure=False), BaseException):
+            log.warning("No Disk for %s: %s", position, outcome)
+        else:
+            arrived.append(position)
+    if lacking and not arrived:
+        log.info("Slot %s is left as it is: no Disk it lacks could be had", stamp(slot))
+        return None
+    downloads = fetch([p for p in cfg.satellite_set if p not in lacking])
     # Every render reads the city lights. Waiting for them here, the Disks
     # still download meanwhile: a build of the lights must not make one late.
     city_lights()
@@ -352,7 +369,6 @@ def _build(
     renders: dict[str, str] = {}
     # Render each Disk as it arrives: a late one must not hold up the others.
     # ``cfg.parallel_renders`` run at once; a Disk that arrives meanwhile waits.
-    arrived: list[str] = []
     rendering = {}
     while downloads or arrived or rendering:
         while arrived and len(rendering) < cfg.parallel_renders:
