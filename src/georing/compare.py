@@ -115,23 +115,15 @@ COMPARISON_SCENES = (
                     "dusk over the Arabian Sea and southern India"),
     ComparisonScene("night-seviri", "meteosat-iodc", _slot(10, 18), (68, 8, 84, 26),
                     "India at midnight: city lights, low and high cloud"),
-    # The holdout set: another day, other places.
-    ComparisonScene("h-day-ahi", "himawari", _slot(14, 3, 9), (108, -9, 125, 6),
-                    "Borneo, Java and Sulawesi before noon", "holdout"),
-    ComparisonScene("h-day-fci", "meteosat-0", _slot(14, 12, 9), (-10, 30, 8, 44),
-                    "Iberia, Morocco and the western Mediterranean at noon", "holdout"),
+    # The holdout set: another day, other places. SLIDER no longer held the
+    # references of five, two of Himawari, the day of FCI and its warm night,
+    # when they were first kept, and they were dropped.
     ComparisonScene("h-night-cold", "goes-east", _slot(14, 8, 9), (-66, -40, -56, -28),
                     "the Pampas at the end of winter: cold clear ground", "holdout"),
-    ComparisonScene("h-night-warm", "meteosat-0", _slot(14, 1, 9), (18, 25.5, 34, 33),
-                    "Libya and Egypt at night: warm desert", "holdout"),
-    ComparisonScene("h-dawn", "himawari", _slot(14, 22, 9), (121, 28, 142, 40),
-                    "dawn over Korea, Japan and the East China Sea", "holdout"),
     ComparisonScene("h-dusk", "goes-east", _slot(14, 22, 9), (-68, -22, -50, -2),
                     "dusk over Brazil and Bolivia", "holdout"),
     ComparisonScene("h-snow", "goes-east", _slot(14, 15, 9), (-74, -40, -66, -30),
                     "snow on the Andes at the end of winter", "holdout"),
-    ComparisonScene("h-glint", "himawari", _slot(14, 22, 9), (162, -4, 179, 12),
-                    "the sun's reflection on the central Pacific", "holdout"),
     ComparisonScene("h-lowsun", "meteosat-0", _slot(14, 13), (-40, 45, -5, 62),
                     "the North Atlantic under a low midday sun", "holdout"),
     ComparisonScene("h-limb-dusk", "meteosat-0", _slot(14, 21), (-68, -40, -45, 5),
@@ -251,21 +243,26 @@ def reference(scene: ComparisonScene, win: Window, cache: Path) -> np.ndarray:
         return src.read()
 
 
-def ours(scene: ComparisonScene, recipe: str, work: Path, secrets: dict[str, str]) -> tuple[np.ndarray, Window]:
+def comparison_disk(position: str, slot: datetime, work: Path) -> Path:
+    """Return the directory of a Disk kept for the Comparison scenes; download it first if it is not whole."""
+    from georing.catalogue import stamp
+    from georing.download import download_disk
+
+    disk_dir = work / "comparison" / "disks" / stamp(slot) / position
+    if not (disk_dir / ".complete").exists():
+        download_disk(position, slot.isoformat(), str(disk_dir))
+        (disk_dir / ".complete").touch()
+    return disk_dir
+
+
+def ours(scene: ComparisonScene, recipe: str, work: Path) -> tuple[np.ndarray, Window]:
     """Render ``scene`` with ``recipe``; return it as RGB on SLIDER's grid, and that grid."""
     import rasterio
     from rasterio.warp import Resampling, reproject
 
-    from georing.catalogue import stamp
-    from georing.download import download_disk
     from georing.render import load_recipe
 
-    disk_dir = work / "comparison" / "disks" / stamp(scene.slot) / scene.position
-    if not (disk_dir / ".complete").exists():
-        os.environ.update(secrets)
-        download_disk(scene.position, scene.slot.isoformat(), str(disk_dir))
-        (disk_dir / ".complete").touch()
-
+    disk_dir = comparison_disk(scene.position, scene.slot, work)
     scn = load_recipe(scene.position, str(disk_dir), str(work / "grids"), recipe)
     win = window(scene, scn.finest_area())
     # Crop to the window itself, with a margin. Cropped to the scene's
@@ -362,20 +359,19 @@ def main(argv: list[str] | None = None) -> int:
     fetch_static(str(static))
     secrets = load_dotenv(args.env_file)
     lights = Path(build_city_lights(str(lights_path(work)), secrets))
-    os.environ.update(runtime_env(static, args.cores, lights), TMPDIR=str(tmp))
+    os.environ.update(runtime_env(static, args.cores, lights), TMPDIR=str(tmp), **secrets)
     out.mkdir(parents=True, exist_ok=True)
 
-    report = {}
     for scene in select(args.scenes, args.set):
-        mine, win = ours(scene, args.recipe, work, secrets)
+        mine, win = ours(scene, args.recipe, work)
         theirs = reference(scene, win, work / "comparison" / "reference")
         _write_png(out / f"{scene.name}.png", np.concatenate([mine, theirs], axis=2))
-        figures = report[scene.name] = {"set": scene.set, **difference(mine, theirs)}
+        figures = {"set": scene.set, **difference(mine, theirs)}
+        merge_report(out / "difference.json", {scene.name: figures})  # each as it is done
         channel, worst = worst_channel(figures)
         print(f"{scene.name:<13}{scene.set:<8}{scene.position:<11}{scene.slot:%Y-%m-%d %H:%M}  "
               f"ours {figures['ours_mean']}  reference {figures['reference_mean']}  "
               f"|difference| {figures['mean_abs_difference']}  worst {channel} {worst}", flush=True)
-    merge_report(out / "difference.json", report)
     print(f"\nSide by side, ours on the left: {out}")
     # Leaving without teardown (see georing.step) also leaves the Himawari
     # segments satpy unpacked, so clear them here.

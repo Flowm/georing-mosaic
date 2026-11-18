@@ -16,15 +16,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from prefect import flow, get_client, get_run_logger, runtime, task
-from prefect.client.schemas.filters import (
-    DeploymentFilter,
-    DeploymentFilterId,
-    FlowRunFilter,
-    FlowRunFilterState,
-    FlowRunFilterStateType,
-)
-from prefect.client.schemas.objects import StateType
+from prefect import flow, get_run_logger, runtime, task
 from prefect.deployments import run_deployment
 from prefect.futures import as_completed
 
@@ -46,6 +38,13 @@ POLL = timedelta(minutes=1)
 DEADLINE = timedelta(minutes=35)
 # A step that has not finished by then is stopped. The slowest takes five minutes.
 STEP_TIMEOUT = timedelta(minutes=30)
+# A download that has not finished by then is stopped, and asked for again
+# until the deadline. The slowest takes 80 s; one that hangs on a source in
+# trouble must not hold the Slot long past its deadline.
+DOWNLOAD_TIMEOUT = timedelta(minutes=5)
+# A rebuild that got nothing, as when a source answers a search but not a
+# download, is asked for again after this long.
+REBUILD_AGAIN = timedelta(hours=6)
 # A Slot that was never built is made up for only this long. An outage longer
 # than that is a backfill, which someone asks for.
 RETRY_UNBUILT = timedelta(hours=6)
@@ -94,8 +93,8 @@ def _askable(cfg: Settings) -> list[str]:
     return [p for p in cfg.satellite_set if by_position(p).bucket or secrets]
 
 
-def _step(cfg: Settings, step: str, target: str, env: dict[str, str], **kwargs):
-    return run_step(step, target, env, cfg.all_cores, timeout_s=STEP_TIMEOUT.total_seconds(), **kwargs)
+def _step(cfg: Settings, step: str, target: str, env: dict[str, str], timeout: timedelta = STEP_TIMEOUT, **kwargs):
+    return run_step(step, target, env, cfg.all_cores, timeout_s=timeout.total_seconds(), **kwargs)
 
 
 @task
@@ -113,7 +112,7 @@ def download(position: str, slot: datetime, scratch: str, deadline: datetime) ->
         try:
             lacking = _step(
                 cfg, f"download {position}", "georing.download:poll_disk",
-                {**_env(cfg, Path(scratch)), **secrets},
+                {**_env(cfg, Path(scratch)), **secrets}, timeout=DOWNLOAD_TIMEOUT,
                 position=position, slot=slot.isoformat(), dest=f"{scratch}/{position}",
             )
         except StepFailed as failure:
@@ -238,24 +237,6 @@ def _slot_run_name() -> str:
     return f"georing-slot-{stamp(scheduled_slot(runtime.flow_run.parameters.get('slot')))}"
 
 
-def name_scheduled_runs() -> None:
-    """Name the runs that are scheduled ahead after their Slots.
-
-    Prefect's scheduler gives a run it creates a random name, and a run takes
-    its own name only when it starts. Until then the list of upcoming runs
-    would not say which hour each is for.
-    """
-    waiting = FlowRunFilter(state=FlowRunFilterState(type=FlowRunFilterStateType(any_=[StateType.SCHEDULED])))
-    ours = DeploymentFilter(id=DeploymentFilterId(any_=[runtime.deployment.id]))
-    with get_client(sync_client=True) as client:
-        for run in client.read_flow_runs(flow_run_filter=waiting, deployment_filter=ours):
-            asked = run.parameters.get("slot")
-            when = datetime.fromisoformat(asked) if asked else run.expected_start_time
-            name = f"georing-slot-{stamp(to_slot(when))}"
-            if run.name != name:
-                client.update_flow_run(run.id, name=name)
-
-
 @flow(name="georing-slot", flow_run_name=_slot_run_name)
 def build_slot(slot: datetime | None = None, force: bool = False) -> dict:
     """Build the Slot ``slot``, or the one of the hour the run was scheduled in.
@@ -269,11 +250,6 @@ def build_slot(slot: datetime | None = None, force: bool = False) -> dict:
     cfg = settings()
     hourly = slot is None
     slot = scheduled_slot(slot)
-    if runtime.deployment.id:
-        try:
-            name_scheduled_runs()
-        except Exception as failure:  # noqa: BLE001 (a name must never cost a Slot)
-            log.warning("Could not name the scheduled runs: %r", failure)
     if slot > to_slot(None):
         raise ValueError(f"Slot {stamp(slot)} has not begun")
     catalogue = Catalogue(cfg.store)
@@ -315,6 +291,8 @@ def build_slot(slot: datetime | None = None, force: bool = False) -> dict:
 def _queue_rebuilds(slot: datetime) -> None:
     """Queue a rebuild for each earlier Slot that can now get a Disk it lacks."""
     log = get_run_logger()
+    hours = REBUILD_AGAIN // timedelta(hours=1)
+    asked = slot.replace(hour=slot.hour - slot.hour % hours)
     for late, lacking in late_disks(slot).items():
         log.info("Slot %s can now get %s; queueing its rebuild", late, ", ".join(lacking))
         late_slot = datetime.fromisoformat(late)
@@ -324,9 +302,8 @@ def _queue_rebuilds(slot: datetime) -> None:
             flow_run_name=f"georing-slot-{stamp(late_slot)}", work_queue_name=CATCH_UP_QUEUE,
             # Not a child of this run: cancelling it must not cancel the rebuilds.
             as_subflow=False,
-            # The same rebuild is asked for once. One that failed is not tried
-            # again by itself: a backfill does that.
-            idempotency_key=f"rebuild-{stamp(late_slot)}-{'+'.join(lacking)}",
+            # The same rebuild is asked for once in each REBUILD_AGAIN.
+            idempotency_key=f"rebuild-{stamp(late_slot)}-{'+'.join(lacking)}-{stamp(asked)}",
         )
 
 

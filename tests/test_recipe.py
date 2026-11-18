@@ -112,29 +112,42 @@ def test_twilight_mixes_the_layers_as_light():
 def test_the_twilight_compositor_stretches_and_blends_by_sun_zenith(monkeypatch):
     from pyresample.geometry import AreaDefinition
     from satpy.composites import fill
+    from satpy.modifiers import angles
 
     from georing.recipe import TwilightCompositor
 
     monkeypatch.setattr(fill, "enhance2dataset", lambda data, *a, **k: data)  # layers come in enhanced
-    area = AreaDefinition("row", "", "", "EPSG:4326", 3, 1, (0, -0.5, 3, 0.5))
+    area = AreaDefinition("row", "", "", "EPSG:4326", 4, 1, (0, -0.5, 4, 0.5))
+
+    def grid(values):
+        return xr.DataArray(da.from_array(np.array([values], dtype=np.float64)), dims=("y", "x"), attrs={"area": area})
 
     def layer(values):
         data = np.array(values, dtype=np.float64).T[:, None, :]
-        return xr.DataArray(da.from_array(data, chunks=(3, 1, 3)), dims=("bands", "y", "x"),
+        return xr.DataArray(da.from_array(data, chunks=(3, 1, 4)), dims=("bands", "y", "x"),
                             coords={"bands": list("RGB")}, attrs={"area": area})
 
-    sunz = xr.DataArray(np.array([[70.0, 80.0, 90.0]]), dims=("y", "x"), attrs={"area": area})
+    sunz = grid([70.0, 80.0, 90.0, 70.0])
+    # The last pixel looks straight into the sun's reflection.
+    sun_azimuth, sat_azimuth = grid([0.0, 0.0, 0.0, 90.0]), grid([0.0, 0.0, 0.0, 270.0])
+    monkeypatch.setattr(angles, "get_angles", lambda data: (sat_azimuth, grid([70.0] * 4), sun_azimuth, sunz))
+    monkeypatch.setattr(angles, "get_cos_sza", lambda data: np.cos(np.radians(sunz)))
     orbit = {"satellite_actual_latitude": -6.5, "satellite_actual_longitude": 46.1, "satellite_actual_altitude": 3.6e7}
-    comp = TwilightCompositor("georing", lim_low=82, lim_high=86, gain=(1.0, 1.0, 1.2), offset=(0, 0, 51))
-    day = layer([[0.5] * 3] * 3)
+    comp = TwilightCompositor("georing", lim_low=82, lim_high=86, gain=(1.0, 1.0, 1.2), offset=(0, 0, 51),
+                              stretch_start=76, stretch_end=78, glare_sun=(60, 65), glare_angle=(20, 40))
+    day = layer([[0.5] * 3] * 4)
     day.attrs["orbital_parameters"] = orbit
-    result = comp([day, layer([[0.1] * 3] * 3), sunz])
+    sea = grid([0.0, 0.0, 0.0, 0.0])
+    result = comp([day, layer([[0.1] * 3] * 4)], optional_datasets=[sea])
     # Where the satellite was survives the night layer's static images, which have no orbit.
     assert result.attrs["orbital_parameters"] == orbit
     out = result.values[:, 0, :]
     np.testing.assert_allclose(out[:, 0], [0.5, 0.5, 0.5])  # full day, before the stretch
     np.testing.assert_allclose(out[:, 1], [0.5, 0.5, 0.4], atol=1e-6)  # blue stretched: 0.6 - 0.2
     np.testing.assert_allclose(out[:, 2], [0.1, 0.1, 0.1])  # full night
+    np.testing.assert_allclose(out[:, 3], [0.1, 0.1, 0.1])  # the sea's glare lets the night layer in
+    land = comp([day, layer([[0.1] * 3] * 4)], optional_datasets=[grid([100.0] * 4)])
+    np.testing.assert_allclose(land.values[:, 0, 3], [0.5, 0.5, 0.5])  # land keeps the day layer
 
 
 def test_a_colour_the_table_cannot_vouch_for_fades_to_grey():

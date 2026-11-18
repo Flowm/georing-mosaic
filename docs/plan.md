@@ -67,10 +67,13 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   higher over land and 3.3 K over sea than the other sensors': SEVIRI's
   10.8 − 3.9 µm difference runs that much above FCI's over the same clear
   ground. How both were measured is in the notes, under "SEVIRI".
-- **Comparison scenes:** a tuning set of seventeen on 2026-11-10, which the
-  Recipe is fitted to, and a holdout set of ten at other places, which is only
-  measured: eight on 2026-09-14, and Meteosat-9's two on 2026-10-01, as
-  SLIDER no longer held it for 14 September when it was added. They are
+- **Comparison scenes:** a tuning set of nineteen, seventeen on 2026-11-10
+  and the low-sun and limb scenes on 15 and 16 November, which the Recipe is
+  fitted to, and a holdout set of seven at other places, which is only
+  measured: GOES-East's three on 2026-09-14, Meteosat's two on 2026-11-14
+  and Meteosat-9's two on 2026-10-01. Five more holdout scenes, Himawari's
+  three and two of Meteosat's on 2026-09-14, were dropped on 2026-11-18:
+  SLIDER no longer held their references, so Himawari has none now. They are
   listed in the notes, under "Recipe". The reference is CIRA's GeoColor from
   SLIDER, in each satellite's own view at 1 km (3 km for Meteosat-9).
   `georing-compare` renders each scene and writes it beside its reference.
@@ -131,15 +134,17 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   run is named after its Slot, such as `georing-slot-20261111T2000Z`, so that
   it can be told apart on a Prefect server shared with other projects. There
   is no second flow for backfills: a backfill is runs of the same flow for
-  past Slots. Prefect's scheduler gives the runs it creates ahead
-  random names and a run names itself only when it starts, so each run also
-  names the ones still waiting.
+  past Slots. A run the scheduler creates ahead keeps Prefect's random name
+  until it starts.
 - **Steps:** per satellite a download step that polls once a minute until its
   files exist or the deadline passes, then a render step; then the Mosaic's
   join, encode and publish steps; then one index step. Each step that computes
   runs in a child process of its own (`georing.step`). A step that has not
   finished after 30 minutes (the slowest takes five) is killed, with whatever
-  it started, and counts as failed. A step inherits none of the EUMETSAT and
+  it started, and counts as failed; a download after five minutes (the
+  slowest takes 80 s), so that a source in trouble holds a Slot's downloads
+  no more than five minutes past its deadline. In the EUMETSAT outage of 2026-11-17/18
+  Slots ran 40 to 48 minutes. A step inherits none of the EUMETSAT and
   bucket credentials and has only those it is handed: the two Meteosat
   downloads and the look-back for late Disks get the EUMETSAT key.
 - **One Disk's failure does not cost the Slot.** A Disk that cannot be
@@ -153,9 +158,9 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   failed or never started, lacks every Disk; it counts for six hours, and only
   if an older Mosaic exists, so neither a new deployment nor a long outage
   builds days of Slots unasked. A longer gap is a backfill. The same rebuild
-  is queued once; one that fails is not tried again by itself, because a
-  rebuild is a full build and a Disk that cannot be built would fill the
-  catch-up queue. A backfill tries again. A source that cannot be asked is
+  is queued once in six hours: a source can answer a search but fail the
+  download, and a rebuild queued every hour for each of 48 Slots would fill
+  the catch-up queue, while one queued once was never tried again. A source that cannot be asked is
   asked again next hour and does not fail the run. The sources are asked in a
   step of its own, under the time limit, and never from the flow's own
   process. The setting `rebuild_late` (`GEORING_REBUILD_LATE=false`) turns
@@ -330,9 +335,11 @@ reading".
 - **The references are not kept.** SLIDER holds some weeks, and the copies
   under `work/comparison/reference/` are not in git: they are CIRA's images.
   On 2026-11-15 the local `work/` was deleted and five holdout references
-  (2026-09-14, Himawari and Meteosat) were lost for good; the others can
-  still be fetched again, for some weeks. Decide where the Comparison
-  scenes' references and Disks are to live.
+  (2026-09-14, Himawari and Meteosat) were lost for good; their scenes were
+  dropped. On 2026-11-18 every remaining scene's reference was in
+  `work/comparison/reference/`. Decide where the Comparison scenes'
+  references and Disks are to live, and whether Himawari gets holdout
+  scenes again, on a day SLIDER still holds.
 - **The attribution lists the EUMETSAT line twice** when both Meteosats
   contribute.
 - **The two sides of a Seam differ in colour.** The 5° feather turns the line

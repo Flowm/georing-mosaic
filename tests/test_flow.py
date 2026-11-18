@@ -37,8 +37,9 @@ def steps(tmp_path, monkeypatch):
     settings.cache_clear()
     ran = {"unavailable": set(), "steps": []}
 
-    def run_step(step, target, env, cores, **kwargs):
+    def run_step(step, target, env, cores, timeout_s, **kwargs):
         ran["steps"].append(step)
+        ran.setdefault("timeouts", {})[step] = timeout_s
         if step.startswith("download") and kwargs["position"] in ran["unavailable"]:
             return f"{kwargs['position']}: 0 of 5 files"
         result = None if step.startswith("download") else {}
@@ -79,6 +80,9 @@ def test_a_slot_renders_four_disks_and_publishes_a_mosaic_and_the_catalogue(step
     assert json.loads((out / "latest.json").read_text())["slot"] == "2026-11-10T18:00:00Z"
     assert (out / "catalog.json").exists()
     assert not (tmp_path / "work/scratch/20261110T1800Z").exists()
+    # A download that hangs is stopped long before any other step would be.
+    assert steps["timeouts"]["download goes-east"] == 300
+    assert steps["timeouts"]["mosaic join"] == 1800
 
 
 def test_the_city_lights_are_built_once_with_the_earthdata_login(steps, tmp_path):
@@ -222,41 +226,6 @@ def run_name(state) -> str:
     return get_client(sync_client=True).read_flow_run(state.state_details.flow_run_id).name
 
 
-def test_runs_scheduled_ahead_are_named_after_their_slots(monkeypatch):
-    class Run:
-        def __init__(self, id, name, parameters, expected_start_time):
-            self.id, self.name, self.parameters, self.expected_start_time = id, name, parameters, expected_start_time
-
-    renamed = {}
-
-    class Client:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *exc):
-            return False
-
-        def read_flow_runs(self, flow_run_filter, deployment_filter):
-            assert flow_run_filter.state.type.any_ == [flow.StateType.SCHEDULED]
-            assert [str(i) for i in deployment_filter.id.any_] == [DEPLOYMENT]
-            return [
-                Run(1, "caped-cricket", {}, datetime(2026, 11, 13, 3, 10, tzinfo=UTC)),          # the scheduler's
-                Run(2, "odd-name", {"slot": "2026-11-11T20:00:00+00:00"}, datetime(2026, 11, 13, 2, tzinfo=UTC)),
-                Run(3, "georing-slot-20261113T0400Z", {}, datetime(2026, 11, 13, 4, 10, tzinfo=UTC)),
-            ]
-
-        def update_flow_run(self, flow_run_id, name):
-            renamed[flow_run_id] = name
-
-    monkeypatch.setenv("PREFECT__RUNTIME__DEPLOYMENT__ID", DEPLOYMENT)
-    monkeypatch.setattr(flow, "get_client", lambda sync_client: Client())
-
-    flow.name_scheduled_runs()
-
-    # A run for a named Slot takes that Slot's name; one that has its name is left alone.
-    assert renamed == {1: "georing-slot-20261113T0300Z", 2: "georing-slot-20261111T2000Z"}
-
-
 def test_the_flow_and_each_run_are_named_after_the_project_and_the_slot(steps):
     assert flow.build_slot.name == "georing-slot"
     assert run_name(flow.build_slot(SLOT, return_state=True)) == "georing-slot-20261110T1800Z"
@@ -382,7 +351,6 @@ def hourly(steps, queued, monkeypatch):
     monkeypatch.setenv("EUMETSAT_CONSUMER_SECRET", "secret")
     monkeypatch.setenv("PREFECT__RUNTIME__FLOW_RUN__SCHEDULED_START_TIME", "2026-11-10T18:10:00+00:00")
     monkeypatch.setenv("PREFECT__RUNTIME__DEPLOYMENT__ID", DEPLOYMENT)
-    monkeypatch.setattr(flow, "name_scheduled_runs", lambda: None)
     asked = {"down": set()}
 
     def disk_available(position, slot):
@@ -409,9 +377,9 @@ def test_the_run_of_the_hour_queues_slots_that_lack_a_disk_or_were_never_built(s
 
     rebuilds = {c["slot"]: c["idempotency_key"] for c in queued}
     assert rebuilds == {
-        at(17).isoformat(): "rebuild-20261110T1700Z-himawari",
+        at(17).isoformat(): "rebuild-20261110T1700Z-himawari-20261110T1800Z",
         # 16:00 has no Mosaic, and an older one exists: its run failed.
-        at(16).isoformat(): "rebuild-20261110T1600Z-goes-east+goes-west+himawari+meteosat-0+meteosat-iodc",
+        at(16).isoformat(): "rebuild-20261110T1600Z-goes-east+goes-west+himawari+meteosat-0+meteosat-iodc-20261110T1800Z",
     }                                                            # nothing before 15:00, the oldest Mosaic
     assert {c["work_queue_name"] for c in queued} == {"catch-up"}
     assert {c["as_subflow"] for c in queued} == {False}  # cancelling this run leaves them queued
@@ -438,7 +406,7 @@ def test_without_its_key_the_data_store_is_not_asked(steps, queued, hourly, monk
     flow.build_slot()
 
     assert steps["asked"] == {at(17).isoformat(): ["himawari"]}
-    assert [c["idempotency_key"] for c in queued] == ["rebuild-20261110T1700Z-himawari"]
+    assert [c["idempotency_key"] for c in queued] == ["rebuild-20261110T1700Z-himawari-20261110T1800Z"]
 
 
 def test_a_look_back_that_fails_does_not_fail_the_run(steps, hourly, monkeypatch):
@@ -461,7 +429,7 @@ def test_a_slot_that_was_never_built_is_made_up_for_six_hours_only(steps, queued
     assert sorted(c["slot"] for c in queued) == [at(hour).isoformat() for hour in range(12, 18)]
 
 
-def test_a_rebuild_is_queued_once_however_often_the_run_of_the_hour_looks(steps, queued, hourly, monkeypatch):
+def test_a_rebuild_is_queued_once_every_six_hours_however_often_the_run_of_the_hour_looks(steps, queued, hourly, monkeypatch):
     steps["unavailable"] = {"himawari"}
     flow.build_slot(at(11))
     steps["unavailable"] = set()
@@ -471,8 +439,8 @@ def test_a_rebuild_is_queued_once_however_often_the_run_of_the_hour_looks(steps,
         queued.clear()
         flow.build_slot()
         keys.add(next(c["idempotency_key"] for c in queued if c["slot"] == at(11).isoformat()))
-    # One key: Prefect hands back the run it already has for it.
-    assert keys == {"rebuild-20261110T1100Z-himawari"}
+    # One key in six hours: Prefect hands back the run it already has for it.
+    assert keys == {"rebuild-20261110T1100Z-himawari-20261110T1200Z", "rebuild-20261110T1100Z-himawari-20261110T1800Z"}
 
 def test_a_source_that_cannot_be_asked_does_not_fail_the_run(steps, queued, hourly):
     steps["unavailable"] = {"himawari", "meteosat-0"}
@@ -481,7 +449,7 @@ def test_a_source_that_cannot_be_asked_does_not_fail_the_run(steps, queued, hour
     hourly["down"] = {"meteosat-0"}
 
     assert flow.build_slot()["built"]
-    assert [c["idempotency_key"] for c in queued] == ["rebuild-20261110T1700Z-himawari"]
+    assert [c["idempotency_key"] for c in queued] == ["rebuild-20261110T1700Z-himawari-20261110T1800Z"]
 
 
 # -- renders at once ----------------------------------------------------------

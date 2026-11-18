@@ -8,12 +8,19 @@ composites:
   # from where both satellites see the ground within 65 degrees of vertical
   # and the sun is within 70 degrees of overhead, on 2026-11-10 at 07:00,
   # 09:00 and 11:00 and 2026-09-20 at 09:00 and 11:00 UTC (the green Sahel);
-  # 2026-11-10 13:00 was only measured. Beyond a view of 65 degrees, the
-  # table's own limit, and a sun of 80, the colour fades over 10 degrees to a
-  # neutral grey: at Antarctica's limb under a low sun the bands, divided by
-  # the sun angle, reached 150 to 340% where the table ends at 110%, and its
-  # edges, filled by a polynomial, gave orange. A sun fade from 70 greyed the
-  # dusk-seviri scene, 1.4 levels further from CIRA.
+  # 2026-11-10 13:00 was only measured. Where the table is not to be trusted
+  # the colour fades to a neutral grey, over 8 degrees of sun or view and 20%
+  # past the table's end: there the bands,
+  # divided by a low sun or seen along the limb, reach combinations it never
+  # saw (at Antarctica's limb 150 to 340%, where it ends at 110%), and its
+  # edges, filled by a polynomial, are orange. The view's fade starts at 58
+  # degrees, short of the table's 65: on Meteosat-9's southern limb the
+  # colour turned salmon from 61. The sun's starts at 80, where the night
+  # layer comes in: from 70 it greyed the dusk-seviri scene, 1.4 levels
+  # further from CIRA. The grey is the uncorrected 0.8 um band divided by the
+  # sun as if it stood no lower than 60 degrees: the full correction
+  # multiplies it by up to six there and turned the limb white, where CIRA's
+  # is a muted grey.
   georing_day:
     compositor: !!python/name:georing.recipe.ColourTable
     standard_name: georing_day

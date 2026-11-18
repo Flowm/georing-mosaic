@@ -29,7 +29,7 @@ def test_scenes_are_selected_by_name_or_by_set():
 def test_the_holdout_set_is_another_day_and_other_places():
     tuning = [s for s in COMPARISON_SCENES if s.set == "tuning"]
     holdout = [s for s in COMPARISON_SCENES if s.set == "holdout"]
-    assert len(holdout) >= 8
+    assert len(holdout) >= 7
     assert {s.slot.date() for s in holdout}.isdisjoint({s.slot.date() for s in tuning})
 
     def overlap(a, b):

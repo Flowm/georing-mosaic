@@ -77,20 +77,13 @@ class ColourTable(GenericCompositor):
     (``distrust``): beyond a view of ``view_limit`` degrees from vertical,
     beyond a sun of ``sun_limit`` (each over ``fade_width`` degrees), and
     where the brightest band goes past ``table_top`` percent, the table's
-    end (over ``top_width``). There the bands, divided by a low sun or seen
-    along the limb, reach combinations the table never saw (it was learnt
-    within 65 and 70 degrees), and its edges, filled by a polynomial, are
-    orange. The view's fade starts at 58, short of the table's limit: on
-    Meteosat-9's southern limb the colour turned salmon from 61. The sun's
-    fade starts at 80, where the night layer comes in: from 70 it greyed
-    dusk that CIRA keeps coloured. The grey is the fourth band,
-    the uncorrected 0.8 um one, divided by the sun as if it stood no lower
-    than ``grey_sun_cap``: the Recipe's own correction multiplies it by up to
-    six there and turned the limb white where CIRA's is a muted grey.
+    end (over ``top_width``). The grey is the fourth band, the uncorrected
+    0.8 um one, divided by the sun as if it stood no lower than
+    ``grey_sun_cap``. The Recipe (``seviri.yaml``) says why each is where it is.
     """
 
-    def __init__(self, name, filename=None, sun_limit=80.0, view_limit=58.0, fade_width=8.0,
-                 table_top=110.0, top_width=20.0, grey_sun_cap=60.0, **kwargs):
+    def __init__(self, name, *, filename, sun_limit, view_limit, fade_width,
+                 table_top, top_width, grey_sun_cap, **kwargs):
         with np.load(Path(__file__).parent / "satpy" / filename) as f:
             self.centres, self.table = f["centres"], f["table"]
         self.sun = (sun_limit, sun_limit + fade_width)
@@ -156,23 +149,21 @@ def glare(sunz, glint, sun, angle):
     return ramp(sunz, sun) * (1 - ramp(glint, angle))
 
 
-def _with_orbit(datasets):
-    """Return the first dataset, carrying where the satellite was for satpy's view angles.
+def _with_orbit(day):
+    """Return the day layer, carrying where the satellite was for satpy's view angles.
 
-    Some day layers lose it in their own compositing (AHI's); it is then
-    taken from another layer, or else from the grid, which places the
+    Some day layers lose it in their own compositing (AHI's), and the night
+    layer never has it; it is then taken from the grid, which places the
     satellite on the equator at its nominal longitude.
     """
-    first = datasets[0]
-    if first.attrs.get("orbital_parameters"):
-        return first
-    orbit = next((d.attrs["orbital_parameters"] for d in datasets if d.attrs.get("orbital_parameters")), None)
-    if orbit is None:
-        proj = first.attrs["area"].crs.to_dict()
-        orbit = {"projection_longitude": proj["lon_0"], "projection_latitude": 0.0, "projection_altitude": proj["h"]}
-    first = first.copy()
-    first.attrs["orbital_parameters"] = orbit
-    return first
+    if day.attrs.get("orbital_parameters"):
+        return day
+    proj = day.attrs["area"].crs.to_dict()
+    day = day.copy()
+    day.attrs["orbital_parameters"] = {
+        "projection_longitude": proj["lon_0"], "projection_latitude": 0.0, "projection_altitude": proj["h"],
+    }
+    return day
 
 
 class TwilightCompositor(DayNightCompositor):
@@ -193,39 +184,28 @@ class TwilightCompositor(DayNightCompositor):
     sea or its cloud shows through. There the night layer comes in too: the
     day layer's share falls by `glare`, from ``glare_sun`` (sun zeniths,
     from none to all) and ``glare_angle`` (glint angles, from all to none),
-    over water only, as the optional land mask (0 water, 100 land) says.
-    Land under the same sun and view keeps its cloud by day. Without
-    ``glare_sun`` there is no such fade.
+    over water only, as the land mask (0 water, 100 land) says. Land under
+    the same sun and view keeps its cloud by day.
     """
 
-    def __init__(self, name, gain=(1.0, 1.0, 1.0), offset=(0.0, 0.0, 0.0),
-                 stretch_start=76.0, stretch_end=78.0, gamma=2.2,
-                 glare_sun=None, glare_angle=(20.0, 40.0), **kwargs):
+    def __init__(self, name, *, gain, offset, stretch_start, stretch_end, glare_sun, glare_angle, **kwargs):
         self.gain, self.offset = tuple(gain), tuple(offset)
         self.stretch = (stretch_start, stretch_end)
-        self.gamma = gamma
-        self.glare_sun, self.glare_angle = glare_sun, tuple(glare_angle)
+        self.glare_sun, self.glare_angle = tuple(glare_sun), tuple(glare_angle)
         super().__init__(name, **kwargs)
 
     def __call__(self, datasets, optional_datasets=None, **attrs):
+        from satpy.modifiers.angles import get_angles
+
+        # The land mask is an optional prerequisite only because satpy's
+        # day/night compositor takes a third prerequisite for the sun zenith.
         datasets = self.match_data_arrays(datasets)
-        land = self.match_data_arrays([datasets[0], *optional_datasets])[1] if optional_datasets else None
-        if len(datasets) > 2:
-            self._sunz = datasets[2]
-        else:
-            from satpy.modifiers.angles import get_cos_sza
-
-            self._sunz = np.rad2deg(np.arccos(get_cos_sza(datasets[0])))
-        self._glare = None
-        if self.glare_sun is not None:
-            from satpy.modifiers.angles import get_angles
-
-            sat_azimuth, satz, sun_azimuth, sunz = get_angles(_with_orbit(datasets))
-            glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
-            self._glare = glare(sunz.data, glint, self.glare_sun, self.glare_angle)
-            if land is not None:
-                land = land.squeeze("bands", drop=True) if "bands" in land.dims else land
-                self._glare = self._glare * (1 - land.data / 100).clip(0, 1)
+        land = self.match_data_arrays([datasets[0], *optional_datasets])[1]
+        land = land.squeeze("bands", drop=True) if "bands" in land.dims else land
+        sat_azimuth, satz, sun_azimuth, sunz = get_angles(_with_orbit(datasets[0]))
+        self._sunz = sunz
+        glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
+        self._glare = glare(sunz.data, glint, self.glare_sun, self.glare_angle) * (1 - land.data / 100).clip(0, 1)
         result = super().__call__(datasets, **attrs)
         # Where the satellite was: the night layer's static images have no
         # orbit, so satpy's merged metadata drops it. The Mosaic needs it
@@ -236,8 +216,7 @@ class TwilightCompositor(DayNightCompositor):
 
     # satpy's own merge, but red, green and blue go through `twilight`.
     def _merge_bands_with_weights(self, day_data, night_data, weights, attrs):
-        if self._glare is not None:
-            weights = weights * (1 - self._glare)
+        weights = weights * (1 - self._glare)
         data = []
         for b in _get_band_names(day_data, night_data):
             day_band = _get_single_band_data(day_data, b)
@@ -246,7 +225,7 @@ class TwilightCompositor(DayNightCompositor):
             if name in ("R", "G", "B"):
                 i = "RGB".index(name)
                 band = twilight(day_band, night_band, self._sunz, weights, self.gain[i], self.offset[i],
-                                *self.stretch, gamma=self.gamma)
+                                *self.stretch)
             else:
                 band = day_band * weights + night_band * (1 - weights)
             band.attrs = attrs

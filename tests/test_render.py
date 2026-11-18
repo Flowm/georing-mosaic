@@ -22,18 +22,14 @@ def static_image(level: int) -> xr.DataArray:
     )
 
 
-def on_disk_grid(level: int, cache) -> np.ndarray:
+def test_a_static_image_is_warped_onto_a_satellites_grid_in_its_chunks():
     like = xr.DataArray(da.zeros((20, 20), chunks=10), dims=("y", "x"))
-    return render.static_on_grid(static_image(level), DISK, like, cache).values
-
-
-def test_a_static_image_is_warped_onto_a_satellites_grid_once(tmp_path):
-    first = on_disk_grid(100, tmp_path)
-    assert first.shape == (3, 20, 20)
-    assert first[0, 10, 10] == 100            # below the satellite
-    assert np.isnan(first[0, 0, 0])           # off the Earth
-    # The kept copy answers, whatever is handed in now.
-    assert on_disk_grid(200, tmp_path)[0, 10, 10] == 100
+    out = render.static_on_grid(static_image(100), DISK, like)
+    assert out.chunks[1:] == like.chunks
+    pixels = out.values
+    assert pixels.shape == (3, 20, 20)
+    assert pixels[0, 10, 10] == 100            # below the satellite
+    assert np.isnan(pixels[0, 0, 0])           # off the Earth
 
 
 def test_only_the_known_lines_of_the_libraries_are_kept_quiet(caplog):

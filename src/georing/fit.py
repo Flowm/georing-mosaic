@@ -64,28 +64,18 @@ def grid():
     return AreaDefinition("fit", "fit", "fit", "EPSG:4326", width, height, GRID_BOUNDS)
 
 
-def _disk(position: str, slot: datetime, work: Path) -> Path:
-    from georing.catalogue import stamp
-    from georing.download import download_disk
-
-    disk_dir = work / "comparison" / "disks" / stamp(slot) / position
-    if not (disk_dir / ".complete").exists():
-        download_disk(position, slot.isoformat(), str(disk_dir))
-        (disk_dir / ".complete").touch()
-    return disk_dir
-
-
 def _on_grid(position: str, slot: datetime, work: Path, queries, **load) -> np.ndarray:
     """Return the datasets ``queries`` of a Disk averaged onto the common grid."""
     import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
     from satpy import Scene
 
+    from georing.compare import comparison_disk
     from georing.render import _serialise_netcdf_reads, quiet_known_warnings
     from georing.satellites import by_position
 
     _serialise_netcdf_reads()
     quiet_known_warnings()
-    disk_dir = _disk(position, slot, work)
+    disk_dir = comparison_disk(position, slot, work)
     files = sorted(str(p) for p in disk_dir.iterdir() if not p.name.startswith("."))
     scn = Scene(filenames=files, reader=by_position(position).reader)
     scn.load(queries, **load)
@@ -143,40 +133,23 @@ def weights(x: np.ndarray) -> np.ndarray:
     return 1.0 / counts[steps]
 
 
-def polynomial(bands, powers, coefficients):
-    """Return the sum over terms of ``coefficient * product(band ** power)``."""
-    total = 0
-    for term_powers, coefficient in zip(powers, coefficients, strict=True):
-        term = coefficient
-        for band, power in zip(bands, term_powers, strict=True):
-            if power:
-                term = term * band**power
-        total = total + term
-    return total
-
-
-def exponents(degree: int) -> list[tuple[int, int, int]]:
-    """Return the powers of every term of a polynomial of three bands up to ``degree``."""
-    return sorted(
-        (e for e in itertools.product(range(degree + 1), repeat=3) if sum(e) <= degree),
+def design(x: np.ndarray) -> np.ndarray:
+    """Return, per pixel, every product of SEVIRI's three bands (as fractions) up to ``DEGREE``."""
+    powers = sorted(
+        (e for e in itertools.product(range(DEGREE + 1), repeat=3) if sum(e) <= DEGREE),
         key=lambda e: (sum(e), [-p for p in e]),
     )
+    return np.prod((x / 100)[None, :, :] ** np.array(powers)[:, :, None], axis=1).T
 
 
-def design(x: np.ndarray, powers: list[tuple[int, int, int]]) -> np.ndarray:
-    fractions = list(x / 100)
-    return np.stack([polynomial(fractions, [p], [1.0]) * np.ones(x.shape[1]) for p in powers], axis=1)
-
-
-def fit(x: np.ndarray, y: np.ndarray, degree: int) -> np.ndarray:
+def fit(x: np.ndarray, y: np.ndarray) -> np.ndarray:
     """Fit each row of ``y`` as a polynomial of the rows of ``x``; return the coefficients.
 
     The fit is made twice: pixels more than three robust deviations off the
     first, such as sun glint, which each satellite sees in another place, are
     left out of the second.
     """
-    powers = exponents(degree)
-    a = design(x, powers)
+    a = design(x)
     w = np.sqrt(weights(x))[:, None]
     coefficients = []
     for target in y / 100:
@@ -193,9 +166,9 @@ def table(x: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return the bins' centres per band and the colour table, as ``ColourTable`` reads them."""
     edges = np.linspace(0, np.sqrt(TOP), BINS + 1) ** 2
     centres = np.tile((edges[1:] + edges[:-1]) / 2, (3, 1))
-    coefficients = fit(x, y, DEGREE)
+    coefficients = fit(x, y)
     grid = np.stack(np.meshgrid(*centres, indexing="ij")).reshape(3, -1)
-    colour = (design(grid, exponents(DEGREE)) @ coefficients.T).T * 100
+    colour = (design(grid) @ coefficients.T).T * 100
     bins = np.ravel_multi_index(
         [np.clip(np.digitize(band, edges) - 1, 0, BINS - 1) for band in x], (BINS,) * 3
     )

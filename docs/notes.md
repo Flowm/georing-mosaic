@@ -253,10 +253,12 @@ pyspectral 0.14.3 and pyorbital 1.14.0.
 - The night layer needs two static images that sit on their own lat/lon
   grids, so a plain `load` leaves `geo_color` unmade
   ([issue #2733](https://github.com/pytroll/satpy/issues/2733)). The render
-  warps both onto the satellite's coarsest band grid once, keeps them under
-  `<work_dir>/grids/`, finishes the night layer there, and only then resamples to
-  0.5 km. The night layer is therefore 2 km data for GOES and Himawari and
-  1 km for Meteosat, as the infrared bands are.
+  warps the land mask onto the satellite's coarsest band grid, where the
+  cloud layers are made, and the city lights onto its finest, where the night
+  layer is finished after the last resample (ADR 0006). The warped lights are
+  kept under `<work_dir>/grids/`; the land mask takes about 3 s and is warped
+  for every render. The night layer's clouds are therefore 2 km data for GOES
+  and Himawari and 1 km for Meteosat, as the infrared bands are.
 - [Issue #3397](https://github.com/pytroll/satpy/issues/3397) proposes a
   different sun-angle correction for the built-in composites, so the look may
   change between releases.
@@ -305,7 +307,9 @@ now.
 | lowsun | tuning | GOES-West, 19:00 (2026-11-15) | the North Pacific under a low midday sun | – | – | 7, 9, 10 |
 | h-lowsun | holdout | Meteosat, 13:00 (2026-11-14) | the North Atlantic under a low midday sun | – | – | 8, 12, 17 |
 
-Exact figures are in `difference.json` beside the images. satpy has no
+The five scenes whose reference was lost were dropped from `georing-compare`
+on 2026-11-18; their rows keep the figures last measured. Exact figures are
+in `difference.json` beside the images. satpy has no
 `geo_color` for SEVIRI, and Meteosat-9's scenes were added after the tuning,
 so those two columns are empty for them. Its holdout scenes are on
 2026-10-01: SLIDER no longer held Meteosat-9 for 14 September on 2026-11-14.
@@ -823,8 +827,9 @@ client to one version: a client newer than a self-hosted server is unsupported.
 
 **Inside the flow**
 - One run per Slot: `run_deployment(..., idempotency_key=…)`. Flow run names
-  are not unique. The key names the Slot and the Disks it would add, so the same
-  rebuild is queued once and a later, different one still can be. `work_queue_name=` puts the run in a queue
+  are not unique. The key names the Slot, the Disks it would add and the six hours
+  it was asked in, so the same rebuild is queued once in six hours and a
+  different one still can be. `work_queue_name=` puts the run in a queue
   other than the deployment's.
 - A task that fails after its retries does not have to fail the flow:
   `future.result(raise_on_failure=False)` returns the exception. That is how

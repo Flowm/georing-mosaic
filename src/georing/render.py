@@ -111,7 +111,7 @@ def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIP
             chunks = _upsampled_chunks(coarsest, finest)
             scn[ds_id] = lights.on_grid(scn[ds_id], finest.attrs["area"], chunks, cache, _land_mask())
         else:
-            scn[ds_id] = static_on_grid(scn[ds_id], coarsest.attrs["area"], coarsest, cache)
+            scn[ds_id] = static_on_grid(scn[ds_id], coarsest.attrs["area"], coarsest)
     scn.generate_possible_composites(unload=True)
     return scn
 
@@ -186,59 +186,36 @@ def _land_mask() -> str:
     return str(Path(config.get("data_dir")) / "composites" / LAND_MASK)
 
 
-def static_on_grid(image, area, like, cache_dir: Path):
+def static_on_grid(image, area, like):
     """Return one of the Recipe's static images on a satellite's grid.
 
-    A satellite's grid does not change between Slots, so the image is warped
-    once and kept in ``cache_dir``. It is read back in the chunks of ``like``,
-    a band already on the grid: satpy's own resamplers return other chunks,
-    and joining the two holds the whole Disk in memory.
+    It is warped by nearest neighbour, as the land mask holds classes, and
+    comes in the chunks of ``like``, a band already on the grid: satpy's own
+    resamplers return other chunks, and joining the two holds the whole Disk
+    in memory.
     """
+    import dask.array as da
     import numpy as np
-    import rasterio
-    import rioxarray
+    import xarray as xr
     from rasterio.transform import from_bounds
     from rasterio.warp import Resampling, reproject
 
     height, width = area.shape
-    transform = from_bounds(*area.area_extent, width, height)
-    path = cache_dir / f"{image.attrs['name'].strip('_')}.tif"
-
-    def current() -> bool:
-        if not path.exists():
-            return False
-        with rasterio.open(path) as ds:
-            return ds.shape == area.shape and ds.transform.almost_equals(transform) and ds.crs == area.crs
-
-    if not current():
-        source = image.attrs["area"]
-        pixels = image.values
-        # A last band of ones marks what the satellite can see at all.
-        pixels = np.concatenate([pixels, np.full_like(pixels[:1], 255)])
-        warped = np.zeros((pixels.shape[0], height, width), dtype=pixels.dtype)
-        reproject(
-            pixels,
-            warped,
-            src_transform=from_bounds(*source.area_extent, source.width, source.height),
-            src_crs=source.crs,
-            dst_transform=transform,
-            dst_crs=area.crs,
-            # The land mask holds classes, which must not be averaged.
-            resampling=Resampling.bilinear if pixels.shape[0] > 2 else Resampling.nearest,
-            num_threads=os.cpu_count(),
-        )
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        part = path.with_name(path.name + ".part")
-        with rasterio.open(
-            part, "w", driver="GTiff", width=width, height=height, count=warped.shape[0],
-            dtype=warped.dtype, crs=area.crs, transform=transform, tiled=True,
-            blockxsize=512, blockysize=512, compress="ZSTD", zstd_level=1,
-        ) as dst:
-            dst.write(warped)
-        part.rename(path)
-
-    grid = rioxarray.open_rasterio(path, chunks={"y": like.chunks[-2], "x": like.chunks[-1]})
-    out = grid[:-1].where(grid[-1] > 0).rename(band="bands")
-    out = out.drop_vars(["spatial_ref", "x", "y"], errors="ignore").assign_coords(bands=image["bands"].values)
-    out.attrs = {**image.attrs, "area": area}
-    return out
+    source = image.attrs["area"]
+    pixels = image.values
+    # A last band of ones marks what the satellite can see at all.
+    pixels = np.concatenate([pixels, np.full_like(pixels[:1], 255)])
+    warped = np.zeros((pixels.shape[0], height, width), dtype=pixels.dtype)
+    reproject(
+        pixels,
+        warped,
+        src_transform=from_bounds(*source.area_extent, source.width, source.height),
+        src_crs=source.crs,
+        dst_transform=from_bounds(*area.area_extent, width, height),
+        dst_crs=area.crs,
+        resampling=Resampling.nearest,
+        num_threads=os.cpu_count(),
+    )
+    grid = da.from_array(warped, chunks=(-1, *like.chunks[-2:]))
+    out = xr.DataArray(grid[:-1], dims=("bands", "y", "x"), coords={"bands": image["bands"].values})
+    return out.where(grid[-1] > 0).assign_attrs({**image.attrs, "area": area})
