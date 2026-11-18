@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from georing.mosaic import blend, seam_angle, view_zenith
+from georing.mosaic import blend, view_zenith
 
 HEIGHT = 35786023.0
 EAST, WEST = -75.2, -137.0
@@ -26,12 +26,13 @@ def test_the_india_seam_is_viewed_at_about_80_degrees_from_both_sides():
     assert 78 < meteosat[0, 0] < 85  # inside the default limit
 
 
-def test_a_coarser_imager_counts_as_a_finer_one_looking_slantwise():
-    zenith = np.array([[0.0, 40.0]], dtype=np.float32)
-    assert seam_angle(zenith, 1.0) is zenith
-    # A 3 km pixel straight down is as large as a 1 km one seen at 70.5 degrees.
-    assert seam_angle(zenith, 3.0)[0, 0] == pytest.approx(np.degrees(np.arccos(1 / 3)), abs=1e-3)
-    assert seam_angle(zenith, 3.0)[0, 1] > 70.5
+def test_a_satellite_off_the_equator_sees_the_far_side_more_slantwise():
+    # Meteosat-9 at 6.5 S, as on 2026-11-15 at 18:00.
+    below = view_zenith(np.array([-6.5]), np.array([46.1]), 46.1, HEIGHT, sat_lat=-6.5)
+    assert below[0, 0] == pytest.approx(0, abs=1e-3)
+    north = np.array([70.0])
+    assert (view_zenith(north, np.array([46.1]), 46.1, HEIGHT, sat_lat=-6.5)[0, 0]
+            > view_zenith(north, np.array([46.1]), 46.1, HEIGHT)[0, 0] + 5)
 
 
 def test_blend_takes_the_steeper_view_and_feathers_only_at_the_seam():
@@ -40,14 +41,14 @@ def test_blend_takes_the_steeper_view_and_feathers_only_at_the_seam():
     out = blend([
         layer(200, view_zenith(lat, lon, EAST, HEIGHT)),
         layer(100, view_zenith(lat, lon, WEST, HEIGHT)),
-    ], widths=[5.0, 5.0])
+    ])
     assert out[0, 0].tolist() == [100, 150, 200]
     assert out[3, 0].tolist() == [255, 255, 255]
 
 
 def test_blend_feather_ends_where_the_views_differ_by_the_seam_width():
     near = np.full((1, 1), 30.0, dtype=np.float32)
-    out = blend([layer(200, near), layer(100, near + 5.0)], widths=[5.0, 5.0])
+    out = blend([layer(200, near), layer(100, near + 5.0)])
     assert out[0, 0, 0] == 200
 
 
@@ -55,7 +56,7 @@ def test_a_satellite_without_data_leaves_the_pixel_to_its_neighbour():
     steep, shallow = np.full((1, 2), 20.0, np.float32), np.full((1, 2), 60.0, np.float32)
     hole = layer(200, steep)
     hole[1][3, 0, 0] = 0
-    out = blend([hole, layer(100, shallow)], widths=[5.0, 5.0])
+    out = blend([hole, layer(100, shallow)])
     assert out[0, 0].tolist() == [100, 200]
     assert out[3, 0].tolist() == [255, 255]
 
@@ -63,13 +64,13 @@ def test_a_satellite_without_data_leaves_the_pixel_to_its_neighbour():
 def test_a_pixel_no_satellite_sees_stays_transparent():
     empty = layer(200, np.full((1, 1), 20.0, np.float32))
     empty[1][3] = 0
-    assert blend([empty, empty], widths=[5.0, 5.0])[:, 0, 0].tolist() == [0, 0, 0, 0]
+    assert blend([empty, empty])[:, 0, 0].tolist() == [0, 0, 0, 0]
 
 
 # -- the join and encode steps, on two small Disks ---------------------------
 
 
-def write_render(path, lon_0: float, red: int) -> str:
+def write_render(path, lon_0: float, red: int, tags: dict | None = None) -> str:
     """Write a 220 px full-disk render of one colour, as the render step's lossless copy."""
     import rasterio
     from rasterio.transform import from_origin
@@ -80,6 +81,7 @@ def write_render(path, lon_0: float, red: int) -> str:
     with rasterio.open(path, "w", driver="GTiff", width=220, height=220, count=4, dtype="uint8",
                        crs=crs, transform=from_origin(-5.5e6, 5.5e6, 50e3, 50e3)) as dst:
         dst.write(rgba)
+        dst.update_tags(**(tags or {}))
     return str(path)
 
 
@@ -123,7 +125,7 @@ def test_two_disks_are_joined_at_their_seam_and_published_on_the_web_tile_grid(t
         assert abs(pixel(src, EAST)[0] - 200) <= 6 and pixel(src, 60.0)[3] == 0
 
 
-def test_a_coarser_imager_takes_over_only_where_it_sees_finer(tmp_path):
+def test_each_pixel_comes_from_the_satellite_that_sees_it_most_steeply(tmp_path):
     import rasterio
 
     from georing.mosaic import join_renderings
@@ -136,15 +138,28 @@ def test_a_coarser_imager_takes_over_only_where_it_sees_finer(tmp_path):
     join_renderings(renders, joined, slot="2026-11-10T06:00:00+00:00", threads=2, zoom=3)
 
     with rasterio.open(joined) as src:
-        # Meteosat-9 views 30E more steeply, but its 3 km pixels are larger there.
-        assert pixel(src, 30.0) == [200, 0, 0, 255]
-        assert pixel(src, 75.0) == [100, 0, 0, 255]
+        # The Seam lies halfway, at 22.75E; Meteosat-9's coarser pixels do not move it.
+        assert pixel(src, 10.0) == [200, 0, 0, 255]
+        assert pixel(src, 35.0) == [100, 0, 0, 255]
 
 
-def test_a_seam_takes_the_narrower_of_its_two_widths():
-    angle = np.full((1, 1), 30.0, dtype=np.float32)
-    # 3 degrees apart: inside a 5 degree Seam, outside a 2.5 degree one.
-    wide = blend([layer(200, angle), layer(100, angle + 3.0)], widths=[5.0, 5.0])
-    narrow = blend([layer(200, angle), layer(100, angle + 3.0)], widths=[5.0, 2.5])
-    assert 100 < wide[0, 0, 0] < 200
-    assert narrow[0, 0, 0] == 200
+def test_the_join_takes_a_satellite_where_it_actually_was(tmp_path):
+    import rasterio
+
+    from georing.mosaic import join_renderings, satellite_positions
+
+    at_equator = write_render(tmp_path / "nominal.tif", 45.5, 100)
+    south = write_render(tmp_path / "south.tif", 45.5, 100, tags={
+        "GEORING_SATELLITE_LON": "45.5", "GEORING_SATELLITE_HEIGHT": str(HEIGHT), "GEORING_SATELLITE_LAT": "-10"})
+    assert satellite_positions(at_equator) == [(45.5, HEIGHT, 0.0)]
+    assert satellite_positions(south) == [(45.5, HEIGHT, 0.0), (45.5, HEIGHT, -10.0)]
+    for path, far_north_seen in ((at_equator, True), (south, False)):
+        joined = str(tmp_path / "joined.tif")
+        join_renderings({"meteosat-iodc": path}, joined, slot="2026-11-15T18:00:00+00:00", threads=2, zoom=3)
+        with rasterio.open(joined) as src:
+            # 74N is seen at 83 degrees from the equator, at 93 from 10 S: the
+            # satellite did not see it. 74S at 83 and at 72: seen. 78S at 87 and
+            # at 78: the satellite saw it, but its grid holds nothing there.
+            assert (pixel(src, 45.5, 74.0)[3] == 255) is far_north_seen
+            assert pixel(src, 45.5, -74.0)[3] == 255
+            assert pixel(src, 45.5, -78.0)[3] == 0

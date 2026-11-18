@@ -40,6 +40,30 @@ def colour_from_table(bands: np.ndarray, centres: np.ndarray, table: np.ndarray)
     return colour.reshape(3, *shape)
 
 
+def toward_grey(colour, grey, fade):
+    """Fade a looked-up colour to the neutral ``grey`` by ``fade``, from 0 (none) to 1 (all)."""
+    return colour * (1 - fade) + grey * fade
+
+
+def distrust(sunz, satz, brightest, sun, view, reach):
+    """Return how far, from 0 to 1, a looked-up colour is not to be trusted.
+
+    It rises as the sun zenith ``sunz`` goes from ``sun[0]`` to ``sun[1]``
+    degrees, the view zenith ``satz`` from ``view[0]`` to ``view[1]``, or the
+    ``brightest`` band from ``reach[0]`` to ``reach[1]`` percent, whichever
+    is furthest.
+    """
+    def ramp(value, limits):
+        return ((value - limits[0]) / (limits[1] - limits[0])).clip(0, 1)
+
+    return np.maximum(np.maximum(ramp(sunz, sun), ramp(satz, view)), ramp(brightest, reach))
+
+
+def capped_sun_correction(reflectance, sunz, cap):
+    """Divide a reflectance by the cosine of the sun zenith, the sun taken no lower than ``cap`` degrees."""
+    return reflectance / np.cos(np.radians(np.minimum(sunz, cap)))
+
+
 class ColourTable(GenericCompositor):
     """Make red, green and blue from three other bands by a look-up table.
 
@@ -48,20 +72,45 @@ class ColourTable(GenericCompositor):
     from what both satellites see at the same time, and writes the table to
     ``filename`` beside the Recipe. Reflectances are in percent, as satpy
     gives them.
+
+    Where the table is not to be trusted the colour fades to a neutral grey
+    (``distrust``): beyond a view of ``view_limit`` degrees from vertical,
+    beyond a sun of ``sun_limit`` (each over ``fade_width`` degrees), and
+    where the brightest band goes past ``table_top`` percent, the table's
+    end (over ``top_width``). There the bands, divided by a low sun or seen
+    along the limb, reach combinations the table never saw (it was learnt
+    within 65 and 70 degrees), and its edges, filled by a polynomial, are
+    orange. The view's fade starts at 58, short of the table's limit: on
+    Meteosat-9's southern limb the colour turned salmon from 61. The sun's
+    fade starts at 80, where the night layer comes in: from 70 it greyed
+    dusk that CIRA keeps coloured. The grey is the fourth band,
+    the uncorrected 0.8 um one, divided by the sun as if it stood no lower
+    than ``grey_sun_cap``: the Recipe's own correction multiplies it by up to
+    six there and turned the limb white where CIRA's is a muted grey.
     """
 
-    def __init__(self, name, filename=None, **kwargs):
+    def __init__(self, name, filename=None, sun_limit=80.0, view_limit=58.0, fade_width=8.0,
+                 table_top=110.0, top_width=20.0, grey_sun_cap=60.0, **kwargs):
         with np.load(Path(__file__).parent / "satpy" / filename) as f:
             self.centres, self.table = f["centres"], f["table"]
+        self.sun = (sun_limit, sun_limit + fade_width)
+        self.view = (view_limit, view_limit + fade_width)
+        self.reach = (table_top, table_top + top_width)
+        self.grey_sun_cap = grey_sun_cap
         super().__init__(name, **kwargs)
 
     def __call__(self, projectables, nonprojectables=None, **attrs):
+        from satpy.modifiers.angles import get_angles
+
         projectables = self.match_data_arrays(projectables)
-        bands = da.stack([p.data for p in projectables]).rechunk({0: 3})
+        bands = da.stack([p.data for p in projectables[:3]]).rechunk({0: 3})
         colour = da.map_blocks(
             colour_from_table, bands, self.centres, self.table, dtype=bands.dtype,
         )
-        rgb = [projectables[0].copy(data=colour[i]) for i in range(3)]
+        _, satz, _, sunz = get_angles(projectables[0])
+        fade = distrust(sunz.data, satz.data, bands.max(axis=0), self.sun, self.view, self.reach)
+        grey = capped_sun_correction(projectables[3].data, sunz.data, self.grey_sun_cap)
+        rgb = [projectables[0].copy(data=toward_grey(colour[i], grey, fade)) for i in range(3)]
         return super().__call__(rgb, **attrs)
 
 
@@ -110,7 +159,13 @@ class TwilightCompositor(DayNightCompositor):
             from satpy.modifiers.angles import get_cos_sza
 
             self._sunz = np.rad2deg(np.arccos(get_cos_sza(datasets[0])))
-        return super().__call__(datasets, optional_datasets=optional_datasets, **attrs)
+        result = super().__call__(datasets, optional_datasets=optional_datasets, **attrs)
+        # Where the satellite was: the night layer's static images have no
+        # orbit, so satpy's merged metadata drops it. The Mosaic needs it
+        # (georing.render.satellite_position_tags).
+        if orbit := datasets[0].attrs.get("orbital_parameters"):
+            result.attrs["orbital_parameters"] = orbit
+        return result
 
     # satpy's own merge, but red, green and blue go through `twilight`.
     def _merge_bands_with_weights(self, day_data, night_data, weights, attrs):

@@ -124,8 +124,35 @@ def test_the_twilight_compositor_stretches_and_blends_by_sun_zenith(monkeypatch)
                             coords={"bands": list("RGB")}, attrs={"area": area})
 
     sunz = xr.DataArray(np.array([[70.0, 80.0, 90.0]]), dims=("y", "x"), attrs={"area": area})
+    orbit = {"satellite_actual_latitude": -6.5, "satellite_actual_longitude": 46.1, "satellite_actual_altitude": 3.6e7}
     comp = TwilightCompositor("georing", lim_low=82, lim_high=86, gain=(1.0, 1.0, 1.2), offset=(0, 0, 51))
-    out = comp([layer([[0.5] * 3] * 3), layer([[0.1] * 3] * 3), sunz]).values[:, 0, :]
+    day = layer([[0.5] * 3] * 3)
+    day.attrs["orbital_parameters"] = orbit
+    result = comp([day, layer([[0.1] * 3] * 3), sunz])
+    # Where the satellite was survives the night layer's static images, which have no orbit.
+    assert result.attrs["orbital_parameters"] == orbit
+    out = result.values[:, 0, :]
     np.testing.assert_allclose(out[:, 0], [0.5, 0.5, 0.5])  # full day, before the stretch
     np.testing.assert_allclose(out[:, 1], [0.5, 0.5, 0.4], atol=1e-6)  # blue stretched: 0.6 - 0.2
     np.testing.assert_allclose(out[:, 2], [0.1, 0.1, 0.1])  # full night
+
+
+def test_a_colour_the_table_cannot_vouch_for_fades_to_grey():
+    from georing.recipe import distrust, toward_grey
+
+    sunz = np.array([60.0, 85.0, 95.0, 40.0, 40.0])
+    satz = np.array([30.0, 30.0, 30.0, 70.0, 30.0])
+    brightest = np.array([80.0, 80.0, 80.0, 80.0, 120.0])
+    fade = distrust(sunz, satz, brightest, sun=(80, 90), view=(65, 75), reach=(110, 130))
+    # Within the table's sun, view and reach; sun halfway past; sun beyond;
+    # view halfway past; the brightest band halfway past the table's end.
+    np.testing.assert_allclose(fade, [0, 0.5, 1, 0.5, 0.5])
+    orange, grey = np.array([36.0, 15.0, 0.0]), np.array([60.0, 60.0, 60.0])
+    np.testing.assert_allclose(toward_grey(orange, grey, 0.5), (orange + grey) / 2)
+
+
+def test_the_grey_is_divided_by_a_sun_no_lower_than_its_cap():
+    from georing.recipe import capped_sun_correction
+
+    out = capped_sun_correction(np.array([25.0, 25.0]), np.array([60.0, 80.0]), 70.0)
+    np.testing.assert_allclose(out, [50.0, 25.0 / np.cos(np.radians(70.0))])

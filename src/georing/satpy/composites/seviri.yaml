@@ -8,11 +8,22 @@ composites:
   # from where both satellites see the ground within 65 degrees of vertical
   # and the sun is within 70 degrees of overhead, on 2026-11-10 at 07:00,
   # 09:00 and 11:00 and 2026-09-20 at 09:00 and 11:00 UTC (the green Sahel);
-  # 2026-11-10 13:00 was only measured.
+  # 2026-11-10 13:00 was only measured. Beyond a view of 65 degrees, the
+  # table's own limit, and a sun of 80, the colour fades over 10 degrees to a
+  # neutral grey: at Antarctica's limb under a low sun the bands, divided by
+  # the sun angle, reached 150 to 340% where the table ends at 110%, and its
+  # edges, filled by a polynomial, gave orange. A sun fade from 70 greyed the
+  # dusk-seviri scene, 1.4 levels further from CIRA.
   georing_day:
     compositor: !!python/name:georing.recipe.ColourTable
     standard_name: georing_day
     filename: seviri_colour.npz
+    sun_limit: 80
+    view_limit: 58
+    fade_width: 8
+    table_top: 110
+    top_width: 20
+    grey_sun_cap: 60
     prerequisites:
       - name: VIS006
         modifiers: [georing_sunz, georing_rayleigh]
@@ -20,6 +31,8 @@ composites:
         modifiers: [georing_sunz]
       - name: IR_016
         modifiers: [georing_sunz]
+      # Uncorrected, for the grey the colour fades to.
+      - name: VIS008
 
   # Low cloud by night, as in visir.yaml but with the ramp moved up. SEVIRI's
   # 10.8 - 3.9 um difference runs higher than FCI's over the same clear ground

@@ -71,7 +71,21 @@ buckets are in `us-east-1` and allow anonymous access.
   limit, which it works out from the nominal position: over Siberia a dark
   lens with lights in it, and beside it a strip seen at more than 85° whose
   infrared reads cold and white. The orbital parameters satpy gives
-  (`satellite_actual_latitude` and so on) hold the true position.
+  (`satellite_actual_latitude` and so on) hold the true position. Since
+  2026-11-15 the render step writes it into the Rendering's tags and the
+  join takes the larger of two view angles: from where the satellite was,
+  and from its grid's nominal position. The first drops the unscanned rim
+  and what was seen past 85° on the far side (over Siberia at 18:00, 1.1% of
+  the world's pixels; Himawari takes over to the east); the second keeps the
+  near side to what the grid holds. With the true position alone, the join
+  took ground 6.5° further south that the satellite saw but its grid does
+  not hold, and warping it drew orange, teal and grey shards off
+  Antarctica. Taken from the scene, the position was lost: the night
+  layer's static images carry no orbit, satpy's merged metadata drops it,
+  and for Meteosat-9, all on one 3 km grid, the bands are unloaded before
+  the render step looks; `TwilightCompositor` hands it on from the day layer.
+  ABI's files give no actual position (the GOES stay on the equator, under
+  0.1° off); AHI's is 0.02°S, FCI's 0.66°S.
 - The Data Store's other SEVIRI collection, `EO:EUM:DAT:MSG:HRSEVIRI`, is
   Meteosat-10 at 0°, on the same 15-minute cycle.
 
@@ -128,9 +142,9 @@ With the 85° limb limit, on a grid of 0.25° between 85°S and 85°N:
 - Any one satellite between 45 and 87°E brings the area seen at more than 75°
   down to about 9.4% and the gap at 40–110°E up to 70–73°N. GK2A at 128.2°E
   brings it to 11.8% and 57.5°N.
-- Meteosat-9 takes, by view angle alone, 23–93°E, 19% of the Earth; where it
-  sees finer (ADR 0005), 63.5–75°E at the equator and 61.5–76.5°E at 45°N,
-  4.1% of the Earth.
+- Meteosat-9 takes, by view angle alone, 23–93°E, 19% of the Earth (ADR
+  0005, since 2026-11-18); where it sees finer (before), 63.5–75°E
+  at the equator and 61.5–76.5°E at 45°N, 4.1% of the Earth.
 
 **Satellites considered for the India seam**
 - Meteosat-9 at 45.5°E: its instrument has no blue or green band and its
@@ -565,6 +579,40 @@ CIRA's Meteosat-9 GeoColor paints the sea grey and the land a vivid green,
 neither as MTG-I1 shows them; that is most of the difference in the table
 above.
 
+Outside what the table was learnt on, it is not to be trusted. At the
+southern limb on 2026-11-15 at 23:00 (the satellite 5.3°N), 55–72°S under a
+sun 75–87° from the zenith, the bands divided by the sun angle reached a
+median of 150, 214 and 190% (VIS006, VIS008, IR_016), up to 340%, where the
+table ends at 110% and is held at its edge; its brightest corners, filled by
+the polynomial, gave about 37, 15, 0: a large orange patch over Antarctica
+in the Mosaic, a thin strip in the evening Slots. Since 2026-11-15 the
+colour fades, over 10°, to a neutral grey as bright as VIS008 beyond a view
+of 65° (the table's limit) or a sun of 80°. Orange pixels there: 3,358 to
+none. A sun fade from 70° (the table's limit too) greyed dusk-seviri from
+9.8, 11.0, 13.2 to 11.2, 12.6, 14.3; from 80° it is 9.6, 11.0, 13.0.
+day-seviri, snow-seviri and h-day-seviri are unchanged either way.
+
+The 01:00 Slot on 2026-11-16 still showed an orange
+spot at 67–70°E, 40–48°S and salmon streaks around it, under a sun of 73–81°
+and a view of 61–72°: the corrected bands there reach about 103, 128 and
+106%, past the table's end, while the fade from 65° had barely begun. The
+grey had its own fault: VIS008 divided by a sun near 80° turned the limb
+white, about 170 against CIRA's 105–110. On that limb (52–78°E, 38–62°S,
+against CIRA's Meteosat-9 GeoColor) the colour now also fades as the
+brightest band goes from 110 to 130%, the view fade runs from 58° to 66° (the
+sun's, sharing its width, from 80° to 88°), and
+the grey is the uncorrected VIS008 divided by the sun taken no lower than
+60°. Orange pixels in the comparison image went from 5,338 to none, and the mean
+|difference| from 68.7, 62.9, 65.6 to 52.4, 48.9, 53.9. Swept on the full
+disk, the view fade from 65° left 14,258 pink pixels on that limb, from 60°
+4,397, from 58° 186; the reach fade alone left the streaks. Capping the
+grey's sun at 70° gave 64.4, 59.9, 63.3, at 60° 54.7, 50.0, 53.4, and no
+correction at all 36.2, 31.2, 35.0, with 433 orange pixels where the view
+fade alone greys. Ours is still brighter there than CIRA's, a mean of about
+155 against 105–110, and white where CIRA's limb is a muted olive grey.
+day-seviri, snow-seviri, dusk-seviri and h-day-seviri are unchanged
+(dusk-seviri 9.7, 10.9, 12.4).
+
 By night, SEVIRI's 10.8 − 3.9 µm difference runs higher than FCI's
 10.5 − 3.8 µm over the same ground at the same time. Medians on the same
 grid at 2026-11-10 00:00, where FCI's 10.5 µm reads 285–295 K: 2.6 K over
@@ -675,19 +723,38 @@ the high-cloud layer can ignore.
   on the Disk's rim, which the join cuts off.
 
 **Joining satellites**
-- The Mosaic computes each satellite's view angle on its own grid, from the
-  longitude and height in the Rendering's projection and a spherical Earth.
-- For a satellite whose pixels are coarser it compares not the view angle
-  but the angle at which a 1 km imager would see as finely,
-  arccos(cos(angle) / km). For Meteosat-9's 3 km that is 70.5° straight
-  below it. That angle changes about a seventh as fast across the ground as a
-  view angle, so a 5° feather would be 900 to 1,300 km wide. At 2.5° it is
-  440 to 690 km between the equator and 60°N, the Seam between the two GOES
-  485 to 940 km.
-  `satpy.modifiers.angles.get_satellite_zenith_angle` gives the same angle,
+- The Mosaic computes each satellite's view angle on its own grid, on a
+  spherical Earth, from the Rendering's projection and from where the
+  satellite actually was (its tags), taking the larger of the two (above,
+  under "Meteosat IODC").
+- `satpy.modifiers.angles.get_satellite_zenith_angle` gives the same angle,
   but only on a Disk's grid.
 - The Renderings are warped to the Mosaic grid with GDAL (bilinear), in
   2048 px chunks, and not with satpy's resamplers.
+- How visible a Seam is, measured: along every Seam on the whole Mosaic at
+  1/16, the mean colour difference between the two neighbours' own
+  Renderings at the same ground (the Renderings read decimated and
+  reprojected; GDAL's warped view of a whole south-up or mirrored grid at
+  that scale returned nothing for MTG-I1 and Meteosat-9). On 2026-11-17, from
+  the same Renderings:
+
+  | Slot | resolution rule and glare penalty | steepest view (ADR 0005) |
+  |---|---|---|
+  | 02:00 | 22.3 | 19.5 |
+  | 03:00 | 24.0 | 21.4 |
+  | 14:00 | 22.6 | 18.1 |
+
+  By Seam the largest change is Himawari and Meteosat-9 at 02:00 and 03:00,
+  52.0 and 58.4 to 30.7 and 28.7; the two GOES stay at 11 to 20, GOES-West
+  and Himawari at 11 to 29 (unchanged), MTG-I1 and Meteosat-9 17 to 24.
+  What is left is the two sensors' own difference and Meteosat-9's made-up
+  colour. By eye, the steepest view removes MTG-I1's burnt dawn limb and
+  white Madagascar (03:00), Himawari's hazy edge at 75°E (02:00, 03:00) and
+  MTG-I1's hazy dusk limb over East Africa (14:00), which the glare penalty
+  had left. White remains toward the poles, where every satellite sees
+  steeply. The glare penalty tried before it (ADR 0005, considered options),
+  which cost 0.03 s per chunk and satellite: at 18:00 on 2026-11-17 it
+  drew the GOES-East and MTG-I1 Seam as a hard line over the Atlantic.
 
 **Output**
 - The `geotiff` writer takes `driver="COG"` and passes GDAL's COG options

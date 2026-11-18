@@ -20,10 +20,6 @@ class Satellite:
     # The Data Store's files of a product that make the Disk, by their names.
     entries: str = ""
     expected_files: int = 0
-    # Size of the colour bands' pixels where the satellite looks straight
-    # down, in km. The Seam lies where two satellites see the ground equally
-    # fine (georing.mosaic.seam_angle).
-    pixel_km: float = 1.0
 
     def prefix(self, slot: datetime) -> str:
         """Return the bucket prefix holding the Disk that starts at ``slot``."""
@@ -92,8 +88,6 @@ SATELLITE_SET: tuple[Satellite, ...] = (
         collections=("EO:EUM:DAT:MSG:HRSEVIRI-IODC",),
         entries=r"\.nat$",
         expected_files=1,
-        # SEVIRI's bands are 3 km; its 1 km HRV band is not used (see the plan).
-        pixel_km=3.0,
     ),
 )
 

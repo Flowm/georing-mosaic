@@ -33,12 +33,15 @@ def render_disk(position: str, disk_dir: str, grid_dir: str, dest: str, threads:
     The Mosaic is joined from these files, so it is compressed once.
     """
     scn = load_recipe(position, disk_dir, grid_dir)
+    position_tags = satellite_position_tags(scn)
     native = scn.resample(scn.finest_area(), resampler="native")
+    position_tags = position_tags or satellite_position_tags(native)
     Path(dest).parent.mkdir(parents=True, exist_ok=True)
     native.save_dataset(
         RECIPE,
         filename=dest,
         writer="geotiff",
+        tags=position_tags,
         compress="ZSTD",
         zstd_level=1,
         blockxsize=512,
@@ -46,6 +49,24 @@ def render_disk(position: str, disk_dir: str, grid_dir: str, dest: str, threads:
         bigtiff="YES",
         num_threads=threads,
     )
+
+
+def satellite_position_tags(scn) -> dict[str, str]:
+    """Return where the satellite actually was during the scan, as the Rendering's tags.
+
+    The bands' grid places the satellite on the equator at its nominal
+    longitude; Meteosat-9's inclined orbit takes it several degrees off. The
+    Mosaic works out view angles from these tags (georing.mosaic). Empty if
+    no band says.
+    """
+    from georing.mosaic import POSITION_TAGS
+
+    for dataset in scn.values():
+        orbit = dataset.attrs.get("orbital_parameters") or {}
+        values = [orbit.get(f"satellite_actual_{k}") for k in ("longitude", "altitude", "latitude")]
+        if all(v is not None for v in values):
+            return {tag: f"{float(v):.4f}" for tag, v in zip(POSITION_TAGS, values, strict=True)}
+    return {}
 
 
 def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIPE):

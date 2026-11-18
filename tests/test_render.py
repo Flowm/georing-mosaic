@@ -70,3 +70,23 @@ def test_the_lights_are_read_in_the_chunks_the_cloud_layers_will_have():
     assert render._upsampled_chunks(coarse, fine) == ((16, 8), (12, 12))
     odd = xr.DataArray(da.zeros((25, 24), chunks=8), dims=("y", "x"), attrs={"area": Area(500, (25, 24))})
     assert render._upsampled_chunks(coarse, odd) == odd.chunks
+
+
+def test_a_rendering_carries_where_the_satellite_actually_was():
+    class Band:
+        def __init__(self, attrs):
+            self.attrs = attrs
+
+    class Scene:
+        def __init__(self, *bands):
+            self.bands = bands
+
+        def values(self):
+            return self.bands
+
+    sevir = Band({"orbital_parameters": {"satellite_actual_longitude": np.float32(46.123),
+                                          "satellite_actual_latitude": -6.476, "satellite_actual_altitude": 35784582.8}})
+    tags = render.satellite_position_tags(Scene(Band({}), sevir))
+    assert tags == {"GEORING_SATELLITE_LON": "46.1230", "GEORING_SATELLITE_HEIGHT": "35784582.8000",
+                    "GEORING_SATELLITE_LAT": "-6.4760"}
+    assert render.satellite_position_tags(Scene(Band({"orbital_parameters": {"projection_longitude": -75.0}}))) == {}

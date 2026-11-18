@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# Meteosat-9 fills the India seam, in MTG-I1's colour, where it sees finer
+# Meteosat-9 fills the India seam, in MTG-I1's colour, where it sees most steeply
 
 Around 70°E, Meteosat at 0° and Himawari both view the ground at about 80°
 from vertical. Meteosat-9, EUMETSAT's satellite over the Indian Ocean at
@@ -11,12 +11,14 @@ from vertical. Meteosat-9, EUMETSAT's satellite over the Indian Ocean at
 bands are 3 km where theirs are 0.5 to 1 km, and it has no blue or green
 band. So:
 
-- **The Seam goes where two satellites see the ground equally finely**: a
-  pixel's footprint grows as 1 / cos of the view angle, and 3 km at nadir is
-  as large as 1 km seen at 70.5°. Meteosat-9 takes over only where the
-  others look more slantwise than that: about 63 to 75°E at every latitude,
-  4% of the Earth. Between the four imagers of equal pixels this is the view
-  angle as before.
+- **Each pixel comes from the satellite that sees it most steeply**, as for
+  the others: by the view angle alone, worked out from where the satellite
+  actually was and from its grid (the larger of the two), feathered over 5°
+  at every Seam. Meteosat-9 takes 23 to 93°E, 19% of the Earth. Its Seams lie
+  halfway to MTG-I1 and to Himawari, where both see the ground at the same
+  angle, under 45° near the equator: neither shows its limb there, and a sun
+  glint, which lies halfway between the sun and each satellite, is matched
+  on both sides.
 - **Its blue and green are looked up in a table of MTG-I1's colour**, made by
   `georing-fit-colour` from what Meteosat-9 and MTG-I1 see of the same ground
   at the same time over Africa, Arabia and the western Indian Ocean. Its day
@@ -27,11 +29,29 @@ band. So:
 
 ## Considered Options
 
-- **Plain view angle, as for the others.** Meteosat-9 would take 23 to 93°E,
-  19% of the Earth, and replace MTG-I1's real colour at 0.5 to 1 km over
-  East Africa and Arabia with made-up colour at 3 km.
+- **The Seam where two satellites see the ground equally finely.** A pixel's
+  footprint grows as 1 / cos of the view angle, and 3 km straight down is as
+  large as 1 km seen at 70.5°: Meteosat-9 would take only 63 to 75°E, 4% of
+  the Earth, and keep MTG-I1's real colour at 0.5 to 1 km over East Africa
+  and Arabia. It ran from 2026-11-14 to 2026-11-18. It kept MTG-I1 and
+  Himawari out to about 70° from vertical: at dawn the low sun burnt MTG-I1's
+  limb white down the Indian Ocean (02:00 and 03:00 on 2026-11-17: a stripe,
+  a band of glint along 56–65°E, a white Madagascar), at dusk it hazed it over
+  East Africa (14:00), and Himawari's hazy limb met Meteosat-9's clear view
+  in a hard edge near 75°E. Measured along every Seam as the colour
+  difference between the two neighbours' own Renderings at the same ground,
+  it was 22.3, 24.0 and 22.6 levels at 02:00, 03:00 and 14:00 on 2026-11-17;
+  by the view angle alone 19.5, 21.4 and 18.1, the Himawari and Meteosat-9
+  Seam 52–58 against 29–31.
+- **The same, with a glare penalty**: a satellite's angle counted up to 40°
+  larger where it looked slantwise into a low sun's reflection (a glint
+  angle under 60–30°, sun zenith and view angle together over 130–136°, the
+  sun not yet set). It took the dawn limb away, but the penalty rose from
+  nothing to 40° over a short distance and drew hard lines (the GOES-East and
+  MTG-I1 Seam over the Atlantic at 18:00 on 2026-11-17), it left the dusk
+  haze and Himawari's edge alone, and it was three more numbers to tune.
 - **A Seam halfway (as if SEVIRI were 2 km).** 53 to 81°E, 8% of the Earth;
-  more of the slant view goes, and more of the neighbours' real colour.
+  still a view of 55–60° at each of Meteosat-9's Seams.
 - **A fixed number of degrees added to Meteosat-9's view angle.** Its view
   angle and the others' change at different rates across the ground, so no
   one offset puts the Seam in the same place at every latitude; near its
@@ -51,9 +71,11 @@ band. So:
 
 - One Disk more per Slot: 260 MB from the Data Store with the same EUMETSAT
   key, and a render of 5 s and 1.5 GB.
-- A Seam with Meteosat-9 is feathered over 2.5° of its angle, not 5°: its
-  angle changes about a seventh as fast across the ground, and 5° would
-  feather 900 to 1,300 km.
+- East Africa, Arabia and India are in Meteosat-9's colour looked up from
+  MTG-I1's, at 3 km, where MTG-I1 saw them in real colour at 0.5 to 1 km.
+  Sharpness steps down at its Seams.
+- The join has no satellite-specific numbers: the view angle, one Seam width
+  and the limb.
 - The colour table is a file of the Recipe,
   `src/georing/satpy/seviri_colour.npz`. Remaking it needs the Disks of both
   satellites for its Slots; the tool and how it is called are in the notes.

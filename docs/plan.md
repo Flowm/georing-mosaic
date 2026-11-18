@@ -20,7 +20,8 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   (MTG-I1, also called Meteosat-12), Meteosat over the Indian Ocean
   (Meteosat-9, position `meteosat-iodc`, since 2026-11-14) and Himawari
   (Himawari-9). The set is a setting. Meteosat-9 fills the India seam, where
-  the others view the ground at about 80° (ADR 0005).
+  the others view the ground at about 80° (ADR 0005), and takes 23 to 93°E,
+  where it sees most steeply (ADR 0005).
 - **Slot:** a full clock hour. A Slot uses each satellite's scan that starts on
   that hour (ADR 0002).
 - **No detail is discarded in processing.** The 0.5 km red band is used, so
@@ -56,7 +57,10 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
 - **Meteosat-9's day colour** is looked up in a table of the colour MTG-I1
   shows for each combination of SEVIRI's red, 0.8 µm and 1.6 µm bands, made
   by `georing-fit-colour` from what both see at the same time, and then takes
-  FCI's tone curves (ADR 0005). By night its low-cloud ramp starts 2.6 K
+  FCI's tone curves (ADR 0005). Where the table never saw the bands the
+  colour fades to a neutral grey: from a view of 58° to 66°, a sun of 80° to
+  88°, and the brightest band from 110 to 130%. The grey is the uncorrected
+  0.8 µm band divided by the sun taken no lower than 60°. By night its low-cloud ramp starts 2.6 K
   higher over land and 3.3 K over sea than the other sensors': SEVIRI's
   10.8 − 3.9 µm difference runs that much above FCI's over the same clear
   ground. How both were measured is in the notes, under "SEVIRI".
@@ -71,14 +75,11 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   follows MTG-I1, not CIRA.
 - **Seam:** a feathered band, written in our own code. satpy's multi-scene
   blend is experimental and a wide weighted average shows high clouds twice.
-  A pixel comes from the satellite that sees the ground finest there: a
-  pixel's footprint grows as 1 / cos of the view angle, so between the four
-  imagers of 0.5 to 1 km this is the steepest view, and Meteosat-9's 3 km
-  counts as 1 km seen at arccos(cos(angle) / 3) (ADR 0005). The band is where
-  the two angles so measured differ by less than 5°, about 470 km on the
-  ground between the two GOES; with Meteosat-9 it is 2.5°, since its angle
-  changes about a seventh as fast across the ground, which keeps those Seams
-  440 to 690 km wide. The width was chosen on the
+  A pixel comes from the satellite that sees it most steeply, by the view
+  angle alone (ADR 0005), so the Seams lie halfway between the satellites,
+  where both see the ground at about the same angle. The band is where the
+  two view angles differ by less than 5°, about 470 km on the ground between
+  the two GOES. The width was chosen on the
   Slots of 2026-11-10 18:00 and 06:00 joined at 0.5°, 2°, 5° and 10°: 0.5°
   and 2° leave a line where the two satellites see haze, glint or dawn in
   different colours (off Brazil by day, at the date line at dawn, over India
@@ -86,7 +87,12 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   is plainly doubled, most of all at 70°E. The mean gradient in the band falls
   to 0.92–0.97 of its value at 0.5° with 5°, and to 0.83–0.93 with 10°.
 - **Limb:** a Rendering is not used where its satellite is more than 85° from
-  vertical. Beyond that the pixels are smeared streaks. The limit was tuned on
+  vertical. Beyond that the pixels are smeared streaks. The angle is the
+  larger of two: from where the satellite actually was during the scan,
+  which the Rendering carries in its tags, and from its grid's nominal
+  position on the equator. Meteosat-9's inclined orbit takes it up to about
+  8° off the equator; the true position cuts what it did not scan, the
+  grid's what its grid does not hold. The limit was tuned on
   real images like the Seam. Without Meteosat-9 this opens a gap around 70°E
   poleward of about 45° latitude; with it the gap there begins near 70°.
   Poleward of 76.5° no geostationary satellite sees any longitude.
@@ -316,13 +322,8 @@ reading".
   (2026-09-14, Himawari and Meteosat) were lost for good; the others can
   still be fetched again, for some weeks. Decide where the Comparison
   scenes' references and Disks are to live.
-- **Meteosat-9's true position.** Its orbit is inclined (6.5°S on
-  2026-11-15 at 18:00), but the Mosaic works out view angles from its
-  nominal position on the equator. So it keeps an unscanned rim filled with
-  night lights (a dark lens over Siberia at 18:00) and a strip seen at more
-  than 85°, and places the Seam with its neighbours from the wrong angles.
-  The Rendering could carry the satellite's actual position for the join
-  (the notes, under "Meteosat IODC").
+- **The attribution lists the EUMETSAT line twice** when both Meteosats
+  contribute.
 - **The two sides of a Seam differ in colour.** The 5° feather turns the line
   into a gradient; the difference itself remains. Off Brazil at 18:00
   Meteosat's side of the sea is grey-beige and GOES-East's blue; at the date

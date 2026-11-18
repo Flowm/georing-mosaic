@@ -8,8 +8,6 @@ from pathlib import Path
 
 import numpy as np
 
-from georing.satellites import by_position
-
 EARTH_RADIUS = 6378137.0
 HALF_WORLD = np.pi * EARTH_RADIUS  # Web Mercator spans +-20037508.34 m
 TILE = 512
@@ -18,14 +16,8 @@ TILE = 512
 # count on it (ADR 0001).
 ZOOM = 8
 # Half-width of the Seam: two satellites are feathered into each other where
-# their view angles, as seam_angle measures them, differ by less than this.
-# Chosen on real Slots; see the plan.
+# their view angles differ by less than this. Chosen on real Slots; see the plan.
 SEAM_WIDTH_DEG = 5.0
-# The same for a Seam with a coarser imager. Its seam_angle changes about a
-# seventh as fast across the ground as a view angle does, so 5 degrees would
-# feather it over 900 to 1,300 km. This keeps it 440 to 690 km wide, as the
-# Seam between the two GOES is 485 to 940 km between the equator and 60N.
-COARSE_SEAM_WIDTH_DEG = 2.5
 # Beyond this view angle a Rendering is smeared along the limb and is left out.
 MAX_VIEW_ZENITH_DEG = 85.0
 # WebP quality of the published Mosaic (ADR 0004).
@@ -38,57 +30,42 @@ def pixels_across(zoom: int) -> int:
     return 256 << zoom
 
 
-def view_zenith(lat: np.ndarray, lon: np.ndarray, sat_lon: float, sat_height: float) -> np.ndarray:
+def view_zenith(
+    lat: np.ndarray, lon: np.ndarray, sat_lon: float, sat_height: float, sat_lat: float = 0.0
+) -> np.ndarray:
     """Return the angle from vertical, in degrees, at which a satellite is seen.
 
     ``lat`` is a column and ``lon`` a row, both in degrees; the result is
     their grid. 90 and above means the satellite is below the horizon. The
-    Earth is taken as a sphere, which shifts every satellite alike.
+    satellite is at ``sat_lat``, ``sat_lon`` and ``sat_height`` metres up: an
+    inclined orbit, as Meteosat-9's, takes it several degrees off the
+    equator. The Earth is taken as a sphere, which shifts every satellite
+    alike.
     """
-    cos_g = np.cos(np.radians(lat))[:, None] * np.cos(np.radians(lon - sat_lon))[None, :]
+    lat_r, sat_r = np.radians(lat)[:, None], np.radians(sat_lat)
+    cos_g = (np.sin(lat_r) * np.sin(sat_r)
+             + np.cos(lat_r) * np.cos(sat_r) * np.cos(np.radians(lon - sat_lon))[None, :])
     sin_g = np.sqrt(np.clip(1.0 - cos_g * cos_g, 0.0, None))
     ratio = EARTH_RADIUS / (EARTH_RADIUS + sat_height)
     return np.degrees(np.arctan2(sin_g, cos_g - ratio)).astype(np.float32)
 
 
-def seam_angle(zenith: np.ndarray, pixel_km: float) -> np.ndarray:
-    """Return the view angle at which a 1 km imager sees the ground as finely.
+def blend(layers: list[tuple[np.ndarray, np.ndarray]], width: float = SEAM_WIDTH_DEG) -> np.ndarray:
+    """Blend RGBA ``layers`` of ``(view angle, rgba)`` into one RGBA array.
 
-    A pixel's footprint on the ground grows about as 1 / cos of the view
-    angle, so an imager of ``pixel_km`` at ``zenith`` sees as finely as a 1 km
-    one at arccos(cos(zenith) / pixel_km). The Mosaic takes each pixel from
-    the satellite that sees it finest by this angle: for satellites of equal
-    pixels it is the view angle itself, and a coarser one takes over only
-    where the finer ones look so slantwise that their pixels are as large.
-    """
-    if pixel_km == 1:
-        return zenith
-    cos = np.cos(np.radians(zenith)) / pixel_km
-    return np.degrees(np.arccos(np.clip(cos, -1.0, 1.0))).astype(np.float32)
-
-
-def blend(layers: list[tuple[np.ndarray, np.ndarray]], widths: list[float]) -> np.ndarray:
-    """Blend RGBA ``layers`` of ``(angle, rgba)`` into one RGBA array.
-
-    Each pixel comes from the satellite with the smallest angle there, the
-    view angle as ``seam_angle`` measures it. Where another satellite's angle
-    is within ``width`` degrees of that, the two are feathered into each
-    other: ``widths`` holds each layer's Seam half-width, and a Seam takes
-    the narrower of its two. A satellite with no data
-    at a pixel takes no part there, so its neighbours fill the gap.
+    Each pixel comes from the satellite that sees it most steeply. Where
+    another satellite's view angle is within ``width`` degrees of that, the
+    two are feathered into each other. A satellite with no data at a pixel
+    takes no part there, so its neighbours fill the gap.
     """
     best = np.full(layers[0][0].shape, np.inf, dtype=np.float32)
-    best_width = np.full(best.shape, np.inf, dtype=np.float32)
-    for (angle, rgba), layer_width in zip(layers, widths, strict=True):
-        finer = np.where(rgba[3] > 0, angle, np.inf) < best
-        best[finer] = angle[finer]
-        best_width[finer] = layer_width
+    for angle, rgba in layers:
+        np.minimum(best, np.where(rgba[3] > 0, angle, np.inf), out=best)
     colour = np.zeros((3, *best.shape), dtype=np.float32)
     opacity = np.zeros(best.shape, dtype=np.float32)
     weight = np.zeros(best.shape, dtype=np.float32)
-    for (angle, rgba), layer_width in zip(layers, widths, strict=True):
-        seam = np.minimum(layer_width, best_width)
-        w = np.clip((best + seam - angle) / seam, 0.0, 1.0)
+    for angle, rgba in layers:
+        w = np.clip((best + width - angle) / width, 0.0, 1.0)
         w = w * w * (3.0 - 2.0 * w)
         w[rgba[3] == 0] = 0.0
         wa = w * rgba[3]
@@ -100,6 +77,32 @@ def blend(layers: list[tuple[np.ndarray, np.ndarray]], widths: list[float]) -> n
     out[:3, seen] = np.rint(colour[:, seen] / opacity[seen])
     out[3, seen] = np.rint(opacity[seen] / weight[seen])
     return out
+
+
+# The tags a Rendering carries the satellite's actual position in (georing.render).
+POSITION_TAGS = ("GEORING_SATELLITE_LON", "GEORING_SATELLITE_HEIGHT", "GEORING_SATELLITE_LAT")
+
+
+def satellite_positions(path: str) -> list[tuple[float, float, float]]:
+    """Return the positions a Rendering's view angles are worked out from: (longitude, height, latitude).
+
+    The first is the Rendering's own grid, which places the satellite on the
+    equator at its nominal longitude; the second, if the render step wrote
+    it in the tags, where the satellite actually was. The join takes the
+    larger view angle of the two. With an inclined orbit (Meteosat-9) the
+    satellite saw the far side of its grid more slantwise than the grid
+    says, and the near side less, but the grid holds nothing beyond its own
+    limb there.
+    """
+    import rasterio
+
+    with rasterio.open(path) as src:
+        tags = src.tags()
+        proj = src.crs.to_dict()
+    positions = [(proj["lon_0"], proj["h"], 0.0)]
+    if all(tag in tags for tag in POSITION_TAGS):
+        positions.append(tuple(float(tags[tag]) for tag in POSITION_TAGS))
+    return positions
 
 
 def join_renderings(
@@ -114,6 +117,7 @@ def join_renderings(
     ``renders`` maps each contributing position to its render. A position
     left out is a missing Disk: the others fill what they can see. Beyond
     ``MAX_VIEW_ZENITH_DEG`` a Rendering is smeared along the limb and is left out.
+    Each pixel comes from the satellite that sees it most steeply (``blend``).
     """
     import rasterio
     from rasterio.enums import ColorInterp, Resampling
@@ -128,12 +132,7 @@ def join_renderings(
     lon_all = -np.degrees(centres / EARTH_RADIUS)
     lat_all = np.degrees(2 * np.arctan(np.exp(centres / EARTH_RADIUS)) - np.pi / 2)
 
-    pixel_km = {position: by_position(position).pixel_km for position in renders}
-    orbit = {}
-    for position, path in renders.items():
-        with rasterio.open(path) as src:
-            proj = src.crs.to_dict()
-            orbit[position] = (proj["lon_0"], proj["h"])
+    orbits = {position: satellite_positions(path) for position, path in renders.items()}
 
     local = threading.local()
 
@@ -158,24 +157,22 @@ def join_renderings(
         row, col = origin
         window = Window(col, row, CHUNK, CHUNK)
         lat, lon = lat_all[row : row + CHUNK], lon_all[col : col + CHUNK]
-        zeniths = {p: view_zenith(lat, lon, *orbit[p]) for p in renders}
-        angles = {p: seam_angle(zeniths[p], pixel_km[p]) for p in renders}
-        layers, widths = [], []
+        zeniths = {p: np.maximum.reduce([view_zenith(lat, lon, *o) for o in orbits[p]]) for p in renders}
+        layers = []
         best = np.full((CHUNK, CHUNK), np.inf, dtype=np.float32)
-        # Finest view first, so that most chunks read one satellite only.
-        for position in sorted(renders, key=lambda p: angles[p].min()):
-            zenith, angle = zeniths[position], angles[position]
-            if zenith.min() >= MAX_VIEW_ZENITH_DEG or (angle >= best + SEAM_WIDTH_DEG).all():
-                continue  # below the limit, or outside every Seam with a finer view
+        # Steepest view first, so that most chunks read one satellite only.
+        for position in sorted(renders, key=lambda p: zeniths[p].min()):
+            zenith = zeniths[position]
+            if zenith.min() >= MAX_VIEW_ZENITH_DEG or (zenith >= best + SEAM_WIDTH_DEG).all():
+                continue  # below the limit, or outside every Seam with a steeper view
             rgba = warped()[position].read(window=window)
             rgba[3][zenith > MAX_VIEW_ZENITH_DEG] = 0
             if rgba[3].any():
-                layers.append((angle, rgba))
-                widths.append(SEAM_WIDTH_DEG if pixel_km[position] == 1 else COARSE_SEAM_WIDTH_DEG)
-                np.minimum(best, np.where(rgba[3] > 0, angle, np.inf), out=best)
+                layers.append((zenith, rgba))
+                np.minimum(best, np.where(rgba[3] > 0, zenith, np.inf), out=best)
         if not layers:
             return window, None
-        return window, layers[0][1] if len(layers) == 1 else blend(layers, widths)
+        return window, layers[0][1] if len(layers) == 1 else blend(layers)
 
     Path(dest).parent.mkdir(parents=True, exist_ok=True)
     origins = [(r, c) for r in range(0, pixels, CHUNK) for c in range(0, pixels, CHUNK)]
