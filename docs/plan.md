@@ -95,7 +95,13 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   is plainly doubled, most of all at 70°E. The mean gradient in the band falls
   to 0.92–0.97 of its value at 0.5° with 5°, and to 0.83–0.93 with 10°.
 - **Limb:** a Rendering is not used where its satellite is more than 85° from
-  vertical. Beyond that the pixels are smeared streaks. The angle is the
+  vertical. Beyond that the pixels are smeared streaks. Its share fades out
+  over the last 5° before that, so that where a neighbour takes over there
+  is no line: near the poles both neighbours often see a place within 5° of
+  each other, and a share cut off at 85° left hard arcs (north of
+  Scandinavia at 2026-11-19 03:00, where MTG-I1 still had about 0.7 of the
+  blend when it stopped). Where no neighbour sees the place, the Rendering
+  keeps its colour to its limit. The angle is the
   larger of two: from where the satellite actually was during the scan,
   which the Rendering carries in its tags, and from its grid's nominal
   position on the equator. Meteosat-9's inclined orbit takes it up to about

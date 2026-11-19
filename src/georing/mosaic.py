@@ -20,6 +20,9 @@ ZOOM = 8
 SEAM_WIDTH_DEG = 5.0
 # Beyond this view angle a Rendering is smeared along the limb and is left out.
 MAX_VIEW_ZENITH_DEG = 85.0
+# Over this many degrees short of that limit a Rendering's share fades out, so
+# that where a neighbour takes over there is no line.
+LIMB_FADE_DEG = 5.0
 # WebP quality of the published Mosaic (ADR 0004).
 QUALITY = 90
 CHUNK = 2048
@@ -55,8 +58,10 @@ def blend(layers: list[tuple[np.ndarray, np.ndarray]], width: float = SEAM_WIDTH
 
     Each pixel comes from the satellite that sees it most steeply. Where
     another satellite's view angle is within ``width`` degrees of that, the
-    two are feathered into each other. A satellite with no data at a pixel
-    takes no part there, so its neighbours fill the gap.
+    two are feathered into each other. Each one's share also fades out over
+    the last ``LIMB_FADE_DEG`` before ``MAX_VIEW_ZENITH_DEG``. A satellite
+    with no data at a pixel takes no part there, so its neighbours fill the
+    gap; one alone at a pixel keeps its colour however small its share.
     """
     best = np.full(layers[0][0].shape, np.inf, dtype=np.float32)
     for angle, rgba in layers:
@@ -66,8 +71,8 @@ def blend(layers: list[tuple[np.ndarray, np.ndarray]], width: float = SEAM_WIDTH
     weight = np.zeros(best.shape, dtype=np.float32)
     for angle, rgba in layers:
         w = np.clip((best + width - angle) / width, 0.0, 1.0)
-        w = w * w * (3.0 - 2.0 * w)
-        w[rgba[3] == 0] = 0.0
+        w = w * w * (3.0 - 2.0 * w) * np.clip((MAX_VIEW_ZENITH_DEG - angle) / LIMB_FADE_DEG, 1e-3, 1.0)
+        w[(rgba[3] == 0) | (angle > MAX_VIEW_ZENITH_DEG)] = 0.0
         wa = w * rgba[3]
         colour += wa * rgba[:3]
         opacity += wa
