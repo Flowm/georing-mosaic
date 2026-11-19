@@ -12,11 +12,7 @@ from pathlib import Path
 import dask.array as da
 import numpy as np
 from satpy.composites.core import GenericCompositor
-from satpy.composites.fill import (
-    DayNightCompositor,
-    _get_band_names,
-    _get_single_band_data,
-)
+from satpy.composites.fill import DayNightCompositor
 
 
 def colour_from_table(bands: np.ndarray, centres: np.ndarray, table: np.ndarray) -> np.ndarray:
@@ -228,21 +224,15 @@ class TwilightCompositor(DayNightCompositor):
             result.attrs["orbital_parameters"] = orbit
         return result
 
-    # satpy's own merge, but red, green and blue go through `twilight`.
+    # satpy's own merge, but the bands go through `twilight`.
     def _merge_bands_with_weights(self, day_data, night_data, weights, attrs):
+        # Both layers are red, green and blue on every satellite.
         brightest = day_data.sel(bands=["R", "G", "B"]).max("bands")
         weights = weights * (1 - self._glare * _ramp(brightest, self.burnt))
         data = []
-        for b in _get_band_names(day_data, night_data):
-            day_band = _get_single_band_data(day_data, b)
-            night_band = _get_single_band_data(night_data, b)
-            name = str(b.values)
-            if name in ("R", "G", "B"):
-                i = "RGB".index(name)
-                band = twilight(day_band, night_band, self._sunz, weights, self.gain[i], self.offset[i],
-                                *self.stretch)
-            else:
-                band = day_band * weights + night_band * (1 - weights)
+        for i, b in enumerate("RGB"):
+            band = twilight(day_data.sel(bands=b), night_data.sel(bands=b), self._sunz, weights,
+                            self.gain[i], self.offset[i], *self.stretch)
             band.attrs = attrs
             data.append(band)
         return data
