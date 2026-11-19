@@ -57,9 +57,11 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   reflection over the sea, along its limb at dawn or dusk, CIRA's day layer
   burns out to white and ours gives way to the night layer. The owner
   judges when it is close enough; that judgement is open.
-- **Meteosat-9's day colour** is looked up in a table of the colour MTG-I1
-  shows for each combination of SEVIRI's red, 0.8 µm and 1.6 µm bands, made
-  by `georing-fit-colour` from what both see at the same time, and then takes
+- **Meteosat-9's day colour** is looked up in a table of the colour its
+  neighbours show for each combination of SEVIRI's red, 0.8 µm and 1.6 µm
+  bands, made by `georing-fit-colour` from what each pair sees at the same
+  time: MTG-I1 everywhere, and Himawari over clear land, which brings South Asia's
+  green (the notes, under "SEVIRI", say why not its sea). It then takes
   FCI's tone curves (ADR 0005). Where the table never saw the bands the
   colour fades to a neutral grey: from a view of 58° to 66°, a sun of 80° to
   88°, the brightest band from 110 to 130%, and over water a glint angle
@@ -384,9 +386,10 @@ reading".
   grey and its land greener than MTG-I1 shows them. By night they differ by
   4 to 26. Whether the made-up colour is close enough at its Seams is the
   owner's judgement, with the Recipe's.
-- **Meteosat-9's colour table** was made from five Slots, three in November
-  and two in September. Snow, and ground greener than the Sahel's, are
-  thinly covered. A table made from more seasons would tell whether it
+- **Meteosat-9's colour table** was made from MTG-I1 on five Slots, three
+  in November and two in September, and Himawari's clear land on six. Snow is
+  thinly covered, and the hazy Arabian Sea stays salmon in the morning: the
+  table cannot tell pollution haze from dust. A table made from more seasons would tell whether it
   holds through the year.
 - **Who serves the Indian Ocean next.** Meteosat-9 is old and serves the
   Indian Ocean as EUMETSAT's "best effort". When it is replaced, the new

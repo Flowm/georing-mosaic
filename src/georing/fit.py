@@ -1,15 +1,20 @@
-"""Tabulate Meteosat-9's colour from MTG-I1's, on what both see at the same time.
+"""Tabulate Meteosat-9's colour from its neighbours', on what each pair sees at the same time.
 
-    georing-fit-colour 2026-11-10T07 2026-11-10T09 2026-11-10T11 \
-        2026-09-20T09 2026-09-20T11 --check 2026-11-10T13
+    georing-fit-colour \
+        --meteosat-0 2026-11-10T07 2026-11-10T09 2026-11-10T11 2026-09-20T09 2026-09-20T11 \
+        --himawari 2026-11-10T03 2026-11-10T05 2026-11-10T07 2026-11-10T09 2026-09-20T05 2026-09-20T09 \
+        --check 2026-11-10T13 2026-11-19T05
 
 SEVIRI has no blue or green band. For each Slot named this renders, on a
-common grid of 0.05 degrees, MTG-I1's day colour before its enhancement (red,
-green and blue as the Recipe makes them for FCI) and SEVIRI's three day bands,
-and keeps the pixels both satellites see well in daylight and that are even
-across their neighbours, so that a cloud seen from two sides does not count.
-It then cuts SEVIRI's three bands into bins and writes, per combination of
-bins, the median colour MTG-I1 shows there (``TABLE``, beside the Recipe).
+grid of 0.05 degrees over what Meteosat-9 shares with each neighbour, the
+neighbour's day colour before its enhancement (red, green and blue as the
+Recipe makes them: MTG-I1 to the west, Himawari to the east) and SEVIRI's
+three day bands, and keeps the pixels both satellites see well in daylight
+and that are even across their neighbours, so that a cloud seen from two
+sides does not count. Each neighbour is learnt from on the Slots named
+after it. It then cuts SEVIRI's three bands into bins and
+writes, per combination of bins, the median colour the neighbours show there
+(``TABLE``, beside the Recipe).
 Bins with too few pixels take a cubic polynomial of SEVIRI's bands fitted on
 all of them, so that the table is whole. ``--check`` Slots are only
 measured. The Disks are kept with the Comparison scenes' under
@@ -32,7 +37,7 @@ import numpy as np
 MAX_VIEW_DEG = 65.0
 MAX_SUN_DEG = 70.0
 GRID_DEG = 0.05
-GRID_BOUNDS = (-15.0, -55.0, 60.0, 55.0)  # west, south, east, north
+SEVIRI_LON = 45.5
 SEVIRI_BANDS = (
     ("VIS006", ("georing_sunz", "georing_rayleigh")),
     ("VIS008", ("georing_sunz",)),
@@ -54,17 +59,39 @@ TOP = 110.0
 MIN_PIXELS = 10
 DEGREE = 3
 TABLE = Path(__file__).parent / "satpy" / "seviri_colour.npz"
+RAYLEIGH = ("georing_sunz", "georing_rayleigh")
+CLEAR_LAND = 40.0
+# Each neighbour: where it overlaps Meteosat-9 (west, south, east, north), its
+# longitude, its red, green and blue before the enhancement, how to load them,
+# and whether only land is learnt from it. Himawari sees its overlap 50-65
+# degrees off vertical, through more haze than MTG-I1: learnt from, its sea
+# turned Meteosat-9's a blotchy grey, and its cloud, blue. Its clear land
+# (SEVIRI's brightest band under ``CLEAR_LAND``) brings South Asia's, also
+# under the morning sun India is seen in; MTG-I1's sea in the morning, low
+# and slantwise over the western Indian Ocean, made the sea blotchy too.
+NEIGHBOURS = {
+    "meteosat-0": ((-15.0, -55.0, 60.0, 55.0), 0.0,
+                   (("vis_06", RAYLEIGH), ("georing_green", None), ("vis_04", RAYLEIGH)), {"resolution": 1000}, False),
+    "himawari": ((70.0, -55.0, 125.0, 55.0), 140.7,
+                 (("B03", RAYLEIGH), ("georing_green", None), ("B01", RAYLEIGH)), {}, True),
+}
 
 
-def grid():
+def grid(bounds):
     from pyresample.geometry import AreaDefinition
 
-    west, south, east, north = GRID_BOUNDS
+    west, south, east, north = bounds
     width, height = round((east - west) / GRID_DEG), round((north - south) / GRID_DEG)
-    return AreaDefinition("fit", "fit", "fit", "EPSG:4326", width, height, GRID_BOUNDS)
+    return AreaDefinition("fit", "fit", "fit", "EPSG:4326", width, height, bounds)
 
 
-def _on_grid(position: str, slot: datetime, work: Path, queries, **load) -> np.ndarray:
+def _queries(bands):
+    from satpy.dataset.dataid import DataQuery
+
+    return [DataQuery(name=n, modifiers=m) if m else DataQuery(name=n) for n, m in bands]
+
+
+def _on_grid(position: str, slot: datetime, work: Path, bounds, queries, **load) -> np.ndarray:
     """Return the datasets ``queries`` of a Disk averaged onto the common grid."""
     import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
     from satpy import Scene
@@ -80,39 +107,52 @@ def _on_grid(position: str, slot: datetime, work: Path, queries, **load) -> np.n
     scn = Scene(filenames=files, reader=by_position(position).reader)
     scn.load(queries, **load)
     # The whole Scene must outlive the reads: dropping it closes the FCI files.
-    out = scn.crop(ll_bbox=GRID_BOUNDS).resample(grid(), resampler="bucket_avg")
+    out = scn.crop(ll_bbox=bounds).resample(grid(bounds), resampler="bucket_avg")
     return np.stack([out[q].values.astype(np.float32) for q in queries])
 
 
-def pairs(slot: datetime, work: Path) -> tuple[np.ndarray, np.ndarray]:
-    """Return SEVIRI's bands and MTG-I1's colour where both can be learnt from.
+def pairs(slot: datetime, work: Path, neighbour: str) -> tuple[np.ndarray, np.ndarray]:
+    """Return SEVIRI's bands and ``neighbour``'s colour where both can be learnt from.
 
     Each is an array of three rows, one per band or channel, in percent.
     """
     from pyorbital.astronomy import sun_zenith_angle
-    from satpy.dataset.dataid import DataQuery
 
     from georing.mosaic import view_zenith
 
-    seviri = _on_grid("meteosat-iodc", slot, work,
-                      [DataQuery(name=n, modifiers=m) for n, m in SEVIRI_BANDS])
-    rayleigh = ("georing_sunz", "georing_rayleigh")
-    fci = _on_grid("meteosat-0", slot, work,
-                   [DataQuery(name="vis_06", modifiers=rayleigh), DataQuery(name="georing_green"),
-                    DataQuery(name="vis_04", modifiers=rayleigh)],
-                   resolution=1000)
-    lons, lats = grid().get_lonlats()
+    bounds, lon_0, colour, load, land_only = NEIGHBOURS[neighbour]
+    seviri = _on_grid("meteosat-iodc", slot, work, bounds, _queries(SEVIRI_BANDS))
+    theirs = _on_grid(neighbour, slot, work, bounds, _queries(colour), **load)
+    lons, lats = grid(bounds).get_lonlats()
     lat, lon = lats[:, 0], lons[0]
     keep = (
-        (view_zenith(lat, lon, 0.0, 35786023.0) < MAX_VIEW_DEG)
-        & (view_zenith(lat, lon, 45.5, 35786023.0) < MAX_VIEW_DEG)
+        (view_zenith(lat, lon, lon_0, 35786023.0) < MAX_VIEW_DEG)
+        & (view_zenith(lat, lon, SEVIRI_LON, 35786023.0) < MAX_VIEW_DEG)
         & (sun_zenith_angle(slot.replace(tzinfo=None), lons, lats) < MAX_SUN_DEG)
         & np.isfinite(seviri).all(axis=0)
-        & np.isfinite(fci).all(axis=0)
+        & np.isfinite(theirs).all(axis=0)
         & _even(seviri[0])
-        & _even(fci[0])
+        & _even(theirs[0])
     )
-    return seviri[:, keep], fci[:, keep]
+    if land_only:
+        keep &= (_land(bounds) == 100) & (seviri.max(axis=0) < CLEAR_LAND)
+    return seviri[:, keep], theirs[:, keep]
+
+
+def _land(bounds) -> np.ndarray:
+    """Return the Recipe's land mask (0 water, 100 land) on the grid over ``bounds``, as its nearest cells."""
+    import rasterio
+    from rasterio.enums import Resampling
+    from rasterio.warp import reproject
+
+    from georing.render import _land_mask
+
+    area = grid(bounds)
+    out = np.zeros(area.shape, dtype=np.uint8)
+    with rasterio.open(_land_mask()) as src:
+        reproject(rasterio.band(src, 1), out, dst_transform=rasterio.transform.from_bounds(*bounds, area.width, area.height),
+                  dst_crs="EPSG:4326", resampling=Resampling.nearest)
+    return out
 
 
 def _even(band: np.ndarray) -> np.ndarray:
@@ -201,8 +241,10 @@ def main(argv: list[str] | None = None) -> int:
     from georing.step import runtime_env
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("slots", nargs="+", type=_slot, help="Slots to fit on, such as 2026-11-10T09")
-    parser.add_argument("--check", nargs="*", type=_slot, default=[], help="Slots only measured")
+    for neighbour in NEIGHBOURS:
+        parser.add_argument(f"--{neighbour}", nargs="*", type=_slot, default=[],
+                            help=f"Slots to learn from {neighbour} on, such as 2026-11-10T09")
+    parser.add_argument("--check", nargs="*", type=_slot, default=[], help="Slots only measured, on every neighbour")
     parser.add_argument("--work", type=Path, default=Path("work"))
     parser.add_argument("--cores", type=int, default=8)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
@@ -213,24 +255,29 @@ def main(argv: list[str] | None = None) -> int:
     fetch_static(str(static))
     os.environ.update(runtime_env(static, args.cores, lights_path(work)), **load_dotenv(args.env_file))
 
+    learnt = {n: getattr(args, n.replace("-", "_")) for n in NEIGHBOURS}
     data = {}
-    for slot in [*args.slots, *args.check]:
-        cache = work / "comparison" / "fit" / f"{slot:%Y%m%dT%H}.npz"
-        if not cache.exists():
-            cache.parent.mkdir(parents=True, exist_ok=True)
-            np.savez(cache, *pairs(slot, work))
-        with np.load(cache) as f:
-            data[slot] = (f["arr_0"], f["arr_1"])
-        print(f"{slot:%Y-%m-%d %H:%M}: {data[slot][0].shape[1]} pixels", flush=True)
+    for neighbour, slots in learnt.items():
+        for slot in [*slots, *args.check]:
+            land = "-clear-land" if NEIGHBOURS[neighbour][4] else ""
+            cache = work / "comparison" / "fit" / f"{slot:%Y%m%dT%H}-{neighbour}{land}.npz"
+            if not cache.exists():
+                cache.parent.mkdir(parents=True, exist_ok=True)
+                np.savez(cache, *pairs(slot, work, neighbour))
+            with np.load(cache) as f:
+                data[slot, neighbour] = (f["arr_0"], f["arr_1"])
+            print(f"{slot:%Y-%m-%d %H:%M} {neighbour}: {data[slot, neighbour][0].shape[1]} pixels", flush=True)
 
-    x = np.concatenate([data[s][0] for s in args.slots], axis=1)
-    y = np.concatenate([data[s][1] for s in args.slots], axis=1)
+    x = np.concatenate([data[s, n][0] for n, slots in learnt.items() for s in slots], axis=1)
+    y = np.concatenate([data[s, n][1] for n, slots in learnt.items() for s in slots], axis=1)
     centres, colour = table(x, y)
     np.savez_compressed(TABLE, centres=centres, table=colour)
-    print("\nMean |difference| from MTG-I1 in percent reflectance (red, green, blue):")
+    print("\nMean |difference| from the neighbour in percent reflectance (red, green, blue):")
     print(f"  fitted on {x.shape[1]} pixels: {errors(x, y, centres, colour)}")
     for slot in args.check:
-        print(f"  {slot:%Y-%m-%d %H:%M} (only measured): {errors(*data[slot], centres, colour)}")
+        for n in NEIGHBOURS:
+            if data[slot, n][0].shape[1]:
+                print(f"  {slot:%Y-%m-%d %H:%M} {n} (only measured): {errors(*data[slot, n], centres, colour)}")
     print(f"\nWritten to {TABLE}")
     sys.stdout.flush()
     os._exit(0)  # without teardown, as a step leaves (georing.step)

@@ -591,8 +591,14 @@ render takes 5 s on eight cores and peaks at 1.5 GB.
 
 The day colour is a table, `src/georing/satpy/seviri_colour.npz`, made with
 
-    georing-fit-colour 2026-11-10T07 2026-11-10T09 2026-11-10T11 \
-        2026-09-20T09 2026-09-20T11 --check 2026-11-10T13
+    georing-fit-colour \
+        --meteosat-0 2026-11-10T07 2026-11-10T09 2026-11-10T11 2026-09-20T09 2026-09-20T11 \
+        --himawari 2026-11-10T03 2026-11-10T05 2026-11-10T07 2026-11-10T09 2026-09-20T05 2026-09-20T09 \
+        --check 2026-11-10T13 2026-11-19T05
+
+(Until 2026-11-19 it was made from MTG-I1 alone, on the five MTG-I1 Slots;
+the figures in this paragraph are that table's. Himawari's land was added
+then; see below.)
 
 For each Slot it puts MTG-I1's day colour before its enhancement (red, the
 Recipe's green and blue, Rayleigh-corrected) and SEVIRI's VIS006
@@ -609,6 +615,45 @@ MTG-I1 by 2.6, 2.6 and 2.6% reflectance (red, green, blue) on the cells it was
 made from and by 4.5, 4.3 and 4.1% on 13:00. Clear sea and vegetation are
 within 1% at the median; cloud, which the two see from two sides, is within
 5%; bright desert is 3% too dark in red.
+
+Learnt from MTG-I1 alone, over Africa, Arabia and Europe, the table made
+India olive-brown and the hazy Arabian Sea salmon, where Himawari shows
+green crops under a blue-grey haze (2026-11-19 03:00, both Renderings side
+by side). SEVIRI's bands for India's crops are those of Africa's savanna,
+and MTG-I1's pixels outnumber anything else 80 to 1, so its colour decided
+every such bin. Since 2026-11-19 the table also learns from Himawari, where
+it and Meteosat-9 both see the ground within 65° (70–125°E): its clear land
+only (the land mask, and SEVIRI's brightest band under 40%), on six Slots,
+two of them morning ones, as India is seen at 03:00. What was tried on the
+way, by mean |difference| on the cells (red, green, blue):
+
+- **Both satellites, sea and land, on eight Slots each**: Himawari's cells
+  9.7, 9.4, 9.5 to 5.9, 6.0, 6.5, MTG-I1's 3.1 to 3.2; but day-seviri's sea
+  (2026-11-10 06:00) turned a pale, blotchy grey with hard-edged patches.
+  Himawari sees that sea 50–65° off vertical, through more haze.
+- **Himawari's land only, on the same eight**: the sea stayed blotchy. The
+  cause was MTG-I1's morning Slots (05:00), its view low and slantwise over
+  the western Indian Ocean.
+- **Both on MTG-I1's five Slots**: the sea clean, but India hardly greener:
+  only 23,000 of Himawari's cells.
+- **Each neighbour's median averaged where both have cells**: vegetation's
+  green 6.4 to 6.6 only.
+- **Himawari's land with its cloud**: bright cloud (SEVIRI 85, 85, 40%)
+  turned blue, 77.8, 82.5, 86.3 against 80.0, 83.3, 83.3: Himawari sees it
+  slantwise too.
+
+The table now: MTG-I1 on its five Slots and Himawari's clear land on six,
+1.92 million cells, 2.7, 2.6, 2.6% on them. On 2026-11-10 13:00 it misses
+MTG-I1 by 4.5, 4.3, 4.1, as before; on 2026-11-19 05:00 Himawari's clear
+land by 2.6, 2.3, 2.5. Vegetation on Himawari's land that hour, at the
+median: 5.3, 7.7, 4.4, against 5.6, 6.4, 4.1 before and Himawari's 4.5,
+8.2, 4.5; bright cloud 80.0, 83.5, 83.5. India at 03:00 is green under a
+blue-grey haze. Against CIRA: day-seviri 27.1, 22.7, 14.2 to 26.5, 21.3,
+14.5, snow-seviri 28.0, 21.5, 17.2 to 28.2, 21.9, 17.6; dusk-seviri,
+glint-seviri and h-day-seviri within 0.1. The salmon tint of the hazy
+Arabian Sea at 03:00 stays, as the sea is learnt from MTG-I1 only, and so
+do the orange specks along cloud at Meteosat-9's dawn (0.73% to 0.72% of
+the pixels at 00:00).
 
 What was tried on the way:
 - **A cubic polynomial alone** misses 13:00 by 4.8, 4.4 and 4.4%, but at the

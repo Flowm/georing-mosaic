@@ -19,11 +19,12 @@ band. So:
   angle, under 45° near the equator: neither shows its limb there, and a sun
   glint, which lies halfway between the sun and each satellite, is matched
   on both sides.
-- **Its blue and green are looked up in a table of MTG-I1's colour**, made by
-  `georing-fit-colour` from what Meteosat-9 and MTG-I1 see of the same ground
-  at the same time over Africa, Arabia and the western Indian Ocean. Its day
-  layer then takes FCI's tone curves, and it meets MTG-I1 at its Seam in one
-  colour.
+- **Its blue and green are looked up in a table of its neighbours' colour**,
+  made by `georing-fit-colour` from what Meteosat-9 and MTG-I1 see of the
+  same ground at the same time over Africa, Arabia and the western Indian
+  Ocean, and, since 2026-11-19, from Himawari's land over South Asia. Its
+  day layer then takes FCI's tone curves, and it meets MTG-I1 at its Seam in
+  one colour.
 - **Its 1 km HRV band is not used.** It covers part of the disk only, and a
   step in sharpness would run across India where it ends.
 
