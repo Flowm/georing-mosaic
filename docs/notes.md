@@ -409,6 +409,16 @@ What the Recipe changes from `geo_color`:
   dark sea, burnt-out pixels between 15°E and 100°E fell from 8.9% to 1.6%
   (most of the rest Antarctic ice, which is land and white), and the largest
   render peaked at 22.8 GB, the Slot taking 26 minutes.
+  Since 2026-11-19 it acts only as far as the day layer is burnt out, as
+  its brightest band goes from 0.88 to 0.98 (`burnt`). Meteosat-9's day
+  layer, whose low-sun grey is capped, is not: where the fade acted at 00:00
+  on 2026-11-19 its median was 0.80 (MTG-I1's on limb-dawn 0.96), and the
+  fade swapped it for the night layer's black sea at about 0.22, a dark band
+  along its limb that the map showed as straight north–south stripes over
+  the dawn, cut off at the Himawari Seam. With the gate the stripes are gone.
+  limb-dawn went from 25.2, 25.1, 24.5 to 20.8, 20.7, 20.1, h-limb-dusk from
+  11.9, 12.4, 12.6 to 9.5, 9.9, 10.1, with burnt-out pixels unchanged (0.25%
+  to 0.26%, 13.41%); terminator, dawn, dusk-seviri and h-dusk are unchanged.
 - **Rayleigh correction fades out toward the terminator,** from full at a sun
   angle of 70° to a tenth at 88°. At full strength it takes out more blue than
   a low sun puts in, and dusk turns olive.

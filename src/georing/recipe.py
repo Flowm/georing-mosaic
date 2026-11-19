@@ -195,14 +195,17 @@ class TwilightCompositor(DayNightCompositor):
     sea or its cloud shows through. There the night layer comes in too: the
     day layer's share falls by `glare`, from ``glare_sun`` (sun zeniths,
     from none to all) and ``glare_angle`` (glint angles, from all to none),
-    over water only, as the land mask (0 water, 100 land) says. Land under
-    the same sun and view keeps its cloud by day.
+    over water only, as the land mask (0 water, 100 land) says, and only as
+    far as the day layer is burnt out: as its brightest band goes from
+    ``burnt[0]`` to ``burnt[1]`` (0 to 1). Land under the same sun and view
+    keeps its cloud by day, and so does a day layer that is not burnt out.
     """
 
-    def __init__(self, name, *, gain, offset, stretch_start, stretch_end, glare_sun, glare_angle, **kwargs):
+    def __init__(self, name, *, gain, offset, stretch_start, stretch_end, glare_sun, glare_angle, burnt,
+                 **kwargs):
         self.gain, self.offset = tuple(gain), tuple(offset)
         self.stretch = (stretch_start, stretch_end)
-        self.glare_sun, self.glare_angle = tuple(glare_sun), tuple(glare_angle)
+        self.glare_sun, self.glare_angle, self.burnt = tuple(glare_sun), tuple(glare_angle), tuple(burnt)
         super().__init__(name, **kwargs)
 
     def __call__(self, datasets, optional_datasets=None, **attrs):
@@ -227,7 +230,8 @@ class TwilightCompositor(DayNightCompositor):
 
     # satpy's own merge, but red, green and blue go through `twilight`.
     def _merge_bands_with_weights(self, day_data, night_data, weights, attrs):
-        weights = weights * (1 - self._glare)
+        brightest = day_data.sel(bands=["R", "G", "B"]).max("bands")
+        weights = weights * (1 - self._glare * _ramp(brightest, self.burnt))
         data = []
         for b in _get_band_names(day_data, night_data):
             day_band = _get_single_band_data(day_data, b)

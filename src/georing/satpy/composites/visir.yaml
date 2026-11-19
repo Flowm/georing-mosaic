@@ -56,6 +56,7 @@ composites:
     offset: [24, 36, 52]
     glare_sun: [65, 72]
     glare_angle: [20, 40]
+    burnt: [0.88, 0.98]
     standard_name: georing
     prerequisites:
       - georing_day
