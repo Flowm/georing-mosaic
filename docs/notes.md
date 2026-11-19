@@ -304,6 +304,7 @@ now.
 | night-seviri | tuning | Meteosat-9, 18:00 | India at midnight | – | – | 17, 21, 25 |
 | h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 17, 10, 17 |
 | h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 4 |
+| glint-seviri | tuning | Meteosat-9, 03:00 (2026-11-19) | the sun's reflection south of India | – | – | 33, 28, 25 |
 | lowsun | tuning | GOES-West, 19:00 (2026-11-15) | the North Pacific under a low midday sun | – | – | 7, 9, 10 |
 | h-lowsun | holdout | Meteosat, 13:00 (2026-11-14) | the North Atlantic under a low midday sun | – | – | 8, 12, 17 |
 
@@ -647,6 +648,21 @@ fade alone greys. Ours is still brighter there than CIRA's, a mean of about
 155 against 105–110, and white where CIRA's limb is a muted olive grey.
 day-seviri, snow-seviri, dusk-seviri and h-day-seviri are unchanged
 (dusk-seviri 9.7, 10.9, 12.4).
+
+The table never saw the sun's reflection on the sea, and gave it a desert's
+colour: on 2026-11-19 at 03:00 a beige disk about 15° across south of India
+(85°E, 10°S), orange at its centre, cut off at the Himawari Seam. On open
+sea there (62–92°E, 30°S–5°N), the median colour by glint angle runs about
+80, 85, 95 within 20°, blue less red 6 to 21, against 13, 44, 72 from 24°
+out, blue less red about 55. Over water the colour now fades to the grey
+from a glint angle of 22° to 12°, over the land mask (0 water, 100 land):
+a grey sheen where the disk was, as Himawari and the GOES draw glint and
+as CIRA's Meteosat-9 GeoColor does. A fade from 25° to 15° spread the
+sheen past the disk. The glint-seviri scene (that hour, 72–98°E, 22°S–2°N)
+went from 38.8, 28.7, 18.9 to 33.4, 28.1, 24.9: CIRA paints all of
+Meteosat-9's sea grey, so the figure moves little either way, and the
+images are the measure. day-seviri, snow-seviri, dusk-seviri and
+h-day-seviri are unchanged.
 
 By night, SEVIRI's 10.8 − 3.9 µm difference runs higher than FCI's
 10.5 − 3.8 µm over the same ground at the same time. Medians on the same

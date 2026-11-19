@@ -20,7 +20,11 @@ composites:
   # further from CIRA. The grey is the uncorrected 0.8 um band divided by the
   # sun as if it stood no lower than 60 degrees: the full correction
   # multiplies it by up to six there and turned the limb white, where CIRA's
-  # is a muted grey.
+  # is a muted grey. The sea in the sun's reflection fades to the grey too,
+  # from a glint angle of 22 degrees to 12: there all three bands are bright
+  # and the table, which never saw glint, made the sea beige, with orange at
+  # its centre (2026-11-19 03:00, south of India). Clear sea keeps its blue
+  # from 24 degrees out; Himawari and the GOES draw their glint grey.
   georing_day:
     compositor: !!python/name:georing.recipe.ColourTable
     standard_name: georing_day
@@ -31,6 +35,7 @@ composites:
     table_top: 110
     top_width: 20
     grey_sun_cap: 60
+    glint_angle: [12, 22]
     prerequisites:
       - name: VIS006
         modifiers: [georing_sunz, georing_rayleigh]
@@ -40,6 +45,8 @@ composites:
         modifiers: [georing_sunz]
       # Uncorrected, for the grey the colour fades to.
       - name: VIS008
+      # Glint fades the colour over water only.
+      - georing_land_water_mask
 
   # Low cloud by night, as in visir.yaml but with the ramp moved up. SEVIRI's
   # 10.8 - 3.9 um difference runs higher than FCI's over the same clear ground

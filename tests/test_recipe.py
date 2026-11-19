@@ -180,6 +180,13 @@ def test_the_glint_angle_is_zero_looking_into_the_suns_reflection():
     np.testing.assert_allclose(out, [0.0, 120.0, 0.0], atol=1e-4)
 
 
+def test_near_the_suns_reflection_is_one_within_the_angle_and_none_beyond():
+    from georing.recipe import near_glint
+
+    out = near_glint(np.array([5.0, 15.0, 20.0, 25.0, 40.0]), (15, 25))
+    np.testing.assert_allclose(out, [1.0, 1.0, 0.5, 0.0, 0.0])
+
+
 def test_a_low_sun_glares_where_the_view_is_near_its_reflection():
     from georing.recipe import glare
 

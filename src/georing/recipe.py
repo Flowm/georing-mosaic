@@ -45,6 +45,11 @@ def toward_grey(colour, grey, fade):
     return colour * (1 - fade) + grey * fade
 
 
+def _ramp(value, limits):
+    """Return 0 at ``limits[0]`` and below, 1 at ``limits[1]`` and above, linear between."""
+    return ((value - limits[0]) / (limits[1] - limits[0])).clip(0, 1)
+
+
 def distrust(sunz, satz, brightest, sun, view, reach):
     """Return how far, from 0 to 1, a looked-up colour is not to be trusted.
 
@@ -53,10 +58,7 @@ def distrust(sunz, satz, brightest, sun, view, reach):
     ``brightest`` band from ``reach[0]`` to ``reach[1]`` percent, whichever
     is furthest.
     """
-    def ramp(value, limits):
-        return ((value - limits[0]) / (limits[1] - limits[0])).clip(0, 1)
-
-    return np.maximum(np.maximum(ramp(sunz, sun), ramp(satz, view)), ramp(brightest, reach))
+    return np.maximum(np.maximum(_ramp(sunz, sun), _ramp(satz, view)), _ramp(brightest, reach))
 
 
 def capped_sun_correction(reflectance, sunz, cap):
@@ -77,19 +79,23 @@ class ColourTable(GenericCompositor):
     (``distrust``): beyond a view of ``view_limit`` degrees from vertical,
     beyond a sun of ``sun_limit`` (each over ``fade_width`` degrees), and
     where the brightest band goes past ``table_top`` percent, the table's
-    end (over ``top_width``). The grey is the fourth band, the uncorrected
-    0.8 um one, divided by the sun as if it stood no lower than
-    ``grey_sun_cap``. The Recipe (``seviri.yaml``) says why each is where it is.
+    end (over ``top_width``), and over water where the satellite looks into
+    the sun's reflection, from none at a glint angle of ``glint_angle[1]``
+    degrees to all at ``glint_angle[0]``; the fifth band is the land mask (0
+    water, 100 land). The grey is the fourth band, the uncorrected 0.8 um
+    one, divided by the sun as if it stood no lower than ``grey_sun_cap``.
+    The Recipe (``seviri.yaml``) says why each is where it is.
     """
 
     def __init__(self, name, *, filename, sun_limit, view_limit, fade_width,
-                 table_top, top_width, grey_sun_cap, **kwargs):
+                 table_top, top_width, grey_sun_cap, glint_angle, **kwargs):
         with np.load(Path(__file__).parent / "satpy" / filename) as f:
             self.centres, self.table = f["centres"], f["table"]
         self.sun = (sun_limit, sun_limit + fade_width)
         self.view = (view_limit, view_limit + fade_width)
         self.reach = (table_top, table_top + top_width)
         self.grey_sun_cap = grey_sun_cap
+        self.glint_angle = tuple(glint_angle)
         super().__init__(name, **kwargs)
 
     def __call__(self, projectables, nonprojectables=None, **attrs):
@@ -100,8 +106,11 @@ class ColourTable(GenericCompositor):
         colour = da.map_blocks(
             colour_from_table, bands, self.centres, self.table, dtype=bands.dtype,
         )
-        _, satz, _, sunz = get_angles(projectables[0])
+        sat_azimuth, satz, sun_azimuth, sunz = get_angles(projectables[0])
         fade = distrust(sunz.data, satz.data, bands.max(axis=0), self.sun, self.view, self.reach)
+        land = projectables[4].squeeze("bands", drop=True) if "bands" in projectables[4].dims else projectables[4]
+        glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
+        fade = np.maximum(fade, near_glint(glint, self.glint_angle) * (1 - land.data / 100).clip(0, 1))
         grey = capped_sun_correction(projectables[3].data, sunz.data, self.grey_sun_cap)
         rgb = [projectables[0].copy(data=toward_grey(colour[i], grey, fade)) for i in range(3)]
         return super().__call__(rgb, **attrs)
@@ -143,10 +152,12 @@ def glare(sunz, glint, sun, angle):
     degrees, times as the glint angle ``glint`` falls from ``angle[1]`` to
     ``angle[0]``.
     """
-    def ramp(value, limits):
-        return ((value - limits[0]) / (limits[1] - limits[0])).clip(0, 1)
+    return _ramp(sunz, sun) * near_glint(glint, angle)
 
-    return ramp(sunz, sun) * (1 - ramp(glint, angle))
+
+def near_glint(glint, angle):
+    """Return how near, from 0 to 1, the view is to the sun's reflection: 1 within ``angle[0]`` degrees, 0 beyond ``angle[1]``."""
+    return 1 - _ramp(glint, angle)
 
 
 def _with_orbit(day):

@@ -115,6 +115,9 @@ COMPARISON_SCENES = (
                     "dusk over the Arabian Sea and southern India"),
     ComparisonScene("night-seviri", "meteosat-iodc", _slot(10, 18), (68, 8, 84, 26),
                     "India at midnight: city lights, low and high cloud"),
+    # The sun's reflection south of India, which the colour table made beige.
+    ComparisonScene("glint-seviri", "meteosat-iodc", _slot(19, 3), (72, -22, 98, 2),
+                    "the sun's reflection on the Indian Ocean south of India"),
     # The holdout set: another day, other places. SLIDER no longer held the
     # references of five, two of Himawari, the day of FCI and its warm night,
     # when they were first kept, and they were dropped.
