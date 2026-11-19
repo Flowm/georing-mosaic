@@ -107,6 +107,10 @@ COMPARISON_SCENES = (
     # burnt it out to white.
     ComparisonScene("limb-dawn", "meteosat-0", _slot(16, 2), (40, -45, 62, 5),
                     "MTG-I1's eastern limb at dawn over the Indian Ocean"),
+    # Ice and cloud on MTG-I1's southern limb under a sun about 82 degrees
+    # from the zenith, away from the sun's reflection: it burnt out to white.
+    ComparisonScene("limb-south-dawn", "meteosat-0", _slot(19, 3), (0, -72, 40, -52),
+                    "sea ice and cloud on MTG-I1's southern limb at dawn"),
     ComparisonScene("day-seviri", "meteosat-iodc", _slot(10, 6), (68, 8, 84, 26),
                     "India before noon: the made-up blue and green over land"),
     ComparisonScene("snow-seviri", "meteosat-iodc", _slot(10, 6), (70, 30, 84, 38),

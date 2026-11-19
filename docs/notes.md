@@ -305,6 +305,7 @@ now.
 | h-day-seviri | holdout | Meteosat-9, 07:00 (2026-10-01) | Arabia and Oman | – | – | 17, 10, 17 |
 | h-night-seviri | holdout | Meteosat-9, 20:00 (2026-10-01) | the Bay of Bengal, Bangladesh, Myanmar | – | – | 4, 4, 4 |
 | glint-seviri | tuning | Meteosat-9, 03:00 (2026-11-19) | the sun's reflection south of India | – | – | 33, 28, 25 |
+| limb-south-dawn | tuning | Meteosat, 03:00 (2026-11-19) | sea ice and cloud on MTG-I1's southern limb at dawn | – | – | 15, 15, 15 |
 | lowsun | tuning | GOES-West, 19:00 (2026-11-15) | the North Pacific under a low midday sun | – | – | 7, 9, 10 |
 | h-lowsun | holdout | Meteosat, 13:00 (2026-11-14) | the North Atlantic under a low midday sun | – | – | 8, 12, 17 |
 
@@ -419,6 +420,12 @@ What the Recipe changes from `geo_color`:
   limb-dawn went from 25.2, 25.1, 24.5 to 20.8, 20.7, 20.1, h-limb-dusk from
   11.9, 12.4, 12.6 to 9.5, 9.9, 10.1, with burnt-out pixels unchanged (0.25%
   to 0.26%, 13.41%); terminator, dawn, dusk-seviri and h-dusk are unchanged.
+  The white glow on MTG-I1's southern limb at 03:00 on 2026-11-19 (0–40°E,
+  52–72°S) is not glare: the glint angle there is about 40°, under a sun
+  81–82° from the zenith and a view of 69–79°, sunlit ice and cloud seen
+  slantwise. CIRA's GeoColor draws it the same (limb-south-dawn): means
+  155.8, 159.8, 161.8 against CIRA's 156.6, 159.7, 162.1, burnt-out pixels
+  21.4% against 20.0%. It is left as it is.
 - **Rayleigh correction fades out toward the terminator,** from full at a sun
   angle of 70° to a tenth at 88°. At full strength it takes out more blue than
   a low sun puts in, and dusk turns olive.

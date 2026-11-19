@@ -68,9 +68,9 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   higher over land and 3.3 K over sea than the other sensors': SEVIRI's
   10.8 − 3.9 µm difference runs that much above FCI's over the same clear
   ground. How both were measured is in the notes, under "SEVIRI".
-- **Comparison scenes:** a tuning set of twenty, seventeen on 2026-11-10
-  and the low-sun, limb and Meteosat-9 glint scenes on 15, 16 and 19
-  November, which the Recipe is
+- **Comparison scenes:** a tuning set of twenty-one, seventeen on
+  2026-11-10 and the low-sun, two limb and Meteosat-9 glint scenes on 15, 16
+  and 19 November, which the Recipe is
   fitted to, and a holdout set of seven at other places, which is only
   measured: GOES-East's three on 2026-09-14, Meteosat's two on 2026-11-14
   and Meteosat-9's two on 2026-10-01. Five more holdout scenes, Himawari's
