@@ -738,6 +738,20 @@ Meteosat-9's sea grey, so the figure moves little either way, and the
 images are the measure. day-seviri, snow-seviri, dusk-seviri and
 h-day-seviri are unchanged.
 
+The table was made under a sun within 70° of overhead. Under a lower one it
+paints thin, broken cloud and haze salmon: on 2026-11-20 at 01:00, at dawn
+over the southern Indian Ocean (east of 60°E, south of 15°S), the brightest
+tenth of cloud (display level over 140) runs 2 levels redder than blue at a
+sun of 64°, 14 at 70–72° and 18 to 24 from 72° to 84°, where the grey fade
+ends it; the mean cast is 4 to 7. CIRA's Meteosat-9 shows that cloud grey.
+Cloud and haze now lose their tint, keeping their brightness, as the sun
+goes from 64° to 76°, where the mean colour runs from 10 to 20% (dark sea
+keeps its blue): the brightest tenth is at most 5 redder, and the mean at
+76–84° 4 bluer, from FCI's tone curves. The same fade on every pixel greyed
+the dusk sea where MTG-I1 keeps it blue. dusk-seviri went from 9.7, 10.9,
+12.5 to 9.6, 10.9, 12.5; day-seviri, snow-seviri, glint-seviri and
+h-day-seviri, under a higher sun, are unchanged.
+
 By night, SEVIRI's 10.8 − 3.9 µm difference runs higher than FCI's
 10.5 − 3.8 µm over the same ground at the same time. Medians on the same
 grid at 2026-11-10 00:00, where FCI's 10.5 µm reads 285–295 K: 2.6 K over

@@ -1,5 +1,6 @@
 import dask.array as da
 import numpy as np
+import pytest
 import xarray as xr
 from trollimage.xrimage import XRImage
 
@@ -222,3 +223,12 @@ def test_the_night_layer_is_missing_where_the_satellite_scanned_no_infrared(monk
     out = SeenBackground("georing_night")([clouds, lights, infrared]).values[:, 0, :]
     np.testing.assert_allclose(out[:, 0], [0.2, 0.2, 0.2])  # the lights show under clear sky
     assert np.isnan(out[:, 1]).all()  # no infrared, no night layer: a neighbour may fill it
+
+
+def test_a_colour_loses_its_tint_and_keeps_its_brightness():
+    from georing.recipe import untinted
+
+    salmon = np.array([40.0, 32.0, 27.0])
+    np.testing.assert_allclose(untinted(salmon, 0.0), salmon)
+    np.testing.assert_allclose(untinted(salmon, 1.0), [33.0, 33.0, 33.0])
+    assert untinted(salmon, 0.5).mean() == pytest.approx(salmon.mean())

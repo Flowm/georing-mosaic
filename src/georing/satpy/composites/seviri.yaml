@@ -25,6 +25,13 @@ composites:
   # and the table, which never saw glint, made the sea beige, with orange at
   # its centre (2026-11-19 03:00, south of India). Clear sea keeps its blue
   # from 24 degrees out; Himawari and the GOES draw their glint grey.
+  # Before any of that, cloud and haze lose their tint as the sun goes from
+  # 64 to 76 degrees, keeping their brightness, where the mean colour goes
+  # from 10 to 20%; the sea keeps its blue. The table was made under a sun
+  # within 70 degrees, and at a low sun it painted thin, broken cloud salmon
+  # (2026-11-20 01:00, the southern Indian Ocean at dawn: the brightest
+  # tenth of cloud 14 to 24 levels redder than blue at 70 to 84 degrees, at
+  # most 5 after), where CIRA's is grey. dusk-seviri moves from 9.7 to 9.6.
   georing_day:
     compositor: !!python/name:georing.recipe.ColourTable
     standard_name: georing_day
@@ -36,6 +43,8 @@ composites:
     top_width: 20
     grey_sun_cap: 60
     glint_angle: [12, 22]
+    tint_sun: [64, 76]
+    tint_bright: [10, 20]
     prerequisites:
       - name: VIS006
         modifiers: [georing_sunz, georing_rayleigh]

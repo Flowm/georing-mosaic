@@ -41,6 +41,12 @@ def toward_grey(colour, grey, fade):
     return colour * (1 - fade) + grey * fade
 
 
+def untinted(colour, fade):
+    """Fade the tint out of ``colour`` (red, green and blue in the first axis) by ``fade``, 0 to 1, keeping its mean."""
+    mean = colour.mean(axis=0)
+    return mean + (colour - mean) * (1 - fade)
+
+
 def _ramp(value, limits):
     """Return 0 at ``limits[0]`` and below, 1 at ``limits[1]`` and above, linear between."""
     return ((value - limits[0]) / (limits[1] - limits[0])).clip(0, 1)
@@ -80,11 +86,17 @@ class ColourTable(GenericCompositor):
     degrees to all at ``glint_angle[0]``; the fifth band is the land mask (0
     water, 100 land). The grey is the fourth band, the uncorrected 0.8 um
     one, divided by the sun as if it stood no lower than ``grey_sun_cap``.
+    Before that, as the sun zenith goes from ``tint_sun[0]`` to
+    ``tint_sun[1]`` degrees, the colour loses its tint and keeps its
+    brightness (``untinted``): the table was made under a higher sun. Dark
+    pixels keep theirs, cloud and haze lose it, as the colour's mean goes
+    from ``tint_bright[0]`` to ``tint_bright[1]`` percent.
     The Recipe (``seviri.yaml``) says why each is where it is.
     """
 
     def __init__(self, name, *, filename, sun_limit, view_limit, fade_width,
-                 table_top, top_width, grey_sun_cap, glint_angle, **kwargs):
+                 table_top, top_width, grey_sun_cap, glint_angle, tint_sun, tint_bright,
+                 **kwargs):
         with np.load(Path(__file__).parent / "satpy" / filename) as f:
             self.centres, self.table = f["centres"], f["table"]
         self.sun = (sun_limit, sun_limit + fade_width)
@@ -92,6 +104,7 @@ class ColourTable(GenericCompositor):
         self.reach = (table_top, table_top + top_width)
         self.grey_sun_cap = grey_sun_cap
         self.glint_angle = tuple(glint_angle)
+        self.tint_sun, self.tint_bright = tuple(tint_sun), tuple(tint_bright)
         super().__init__(name, **kwargs)
 
     def __call__(self, projectables, nonprojectables=None, **attrs):
@@ -103,6 +116,7 @@ class ColourTable(GenericCompositor):
             colour_from_table, bands, self.centres, self.table, dtype=bands.dtype,
         )
         sat_azimuth, satz, sun_azimuth, sunz = get_angles(projectables[0])
+        colour = untinted(colour, _ramp(sunz.data, self.tint_sun) * _ramp(colour.mean(axis=0), self.tint_bright))
         fade = distrust(sunz.data, satz.data, bands.max(axis=0), self.sun, self.view, self.reach)
         land = projectables[4].squeeze("bands", drop=True) if "bands" in projectables[4].dims else projectables[4]
         glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
