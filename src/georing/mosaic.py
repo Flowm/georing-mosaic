@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +24,12 @@ MAX_VIEW_ZENITH_DEG = 85.0
 # Over this many degrees short of that limit a Rendering's share fades out, so
 # that where a neighbour takes over there is no line.
 LIMB_FADE_DEG = 5.0
+# Where a satellite looks into the sun's reflection on the sea, its view counts
+# as this many degrees more slanted when the Seam is drawn: a neighbour that
+# sees the place without glint takes it, and no glint patch is cut off at a
+# Seam. Full within the first glint angle, none beyond the second; see the plan.
+GLINT_PENALTY_DEG = 20.0
+GLINT_ANGLE_DEG = (30.0, 45.0)
 # WebP quality of the published Mosaic (ADR 0004).
 QUALITY = 90
 CHUNK = 2048
@@ -53,24 +60,72 @@ def view_zenith(
     return np.degrees(np.arctan2(sin_g, cos_g - ratio)).astype(np.float32)
 
 
-def blend(layers: list[tuple[np.ndarray, np.ndarray]], width: float = SEAM_WIDTH_DEG) -> np.ndarray:
-    """Blend RGBA ``layers`` of ``(view angle, rgba)`` into one RGBA array.
+def sun_direction(when: datetime) -> np.ndarray:
+    """Return the unit vector toward the sun at ``when``, in Earth-fixed coordinates (x to 0 E, z to the pole)."""
+    from pyorbital.astronomy import gmst, sun_ra_dec
 
-    Each pixel comes from the satellite that sees it most steeply. Where
-    another satellite's view angle is within ``width`` degrees of that, the
-    two are feathered into each other. Each one's share also fades out over
-    the last ``LIMB_FADE_DEG`` before ``MAX_VIEW_ZENITH_DEG``. A satellite
-    with no data at a pixel takes no part there, so its neighbours fill the
-    gap; one alone at a pixel keeps its colour however small its share.
+    utc = np.datetime64(when.astimezone(UTC).replace(tzinfo=None))
+    ra, dec = sun_ra_dec(utc)
+    lon = ra - gmst(utc)
+    return np.array([np.cos(dec) * np.cos(lon), np.cos(dec) * np.sin(lon), np.sin(dec)])
+
+
+def glint_penalty(
+    lat: np.ndarray, lon: np.ndarray, sun: np.ndarray, sat_lon: float, sat_height: float, sat_lat: float = 0.0
+) -> np.ndarray:
+    """Return how many degrees a satellite's view counts as more slanted for looking into the sun's reflection.
+
+    ``lat`` is a column and ``lon`` a row, as for `view_zenith`; ``sun`` is
+    `sun_direction`. The glint angle is that between the view and the sun's
+    mirror image in level ground. The penalty is ``GLINT_PENALTY_DEG``
+    within the first of ``GLINT_ANGLE_DEG``, none beyond the second, and
+    fades in as the sun rises the first 5 degrees: with the sun below the
+    horizon there is no glint.
+    """
+    lat_r = np.radians(lat, dtype=np.float32)[:, None]
+    lon_r = np.radians(lon, dtype=np.float32)[None, :]
+    cos_lat, sin_lat, cos_lon, sin_lon = np.cos(lat_r), np.sin(lat_r), np.cos(lon_r), np.sin(lon_r)
+
+    def up_dot(v):  # each pixel's vertical (unit) dotted with v
+        x, y, z = (float(c) for c in v)  # numpy scalars would make the result float64
+        return cos_lat * (x * cos_lon + y * sin_lon) + z * sin_lat
+
+    sat_r, sat_l = np.radians(sat_lat), np.radians(sat_lon)
+    sat = (1 + sat_height / EARTH_RADIUS) * np.array(
+        [np.cos(sat_r) * np.cos(sat_l), np.cos(sat_r) * np.sin(sat_l), np.sin(sat_r)])
+    # The sun's mirror image, 2 (sun . up) up - sun, dotted with the unit view
+    # from the ground to the satellite, (sat - up) / |sat - up|; up . up = 1.
+    sun_up = up_dot(sun)
+    if (sun_up <= 0).all():
+        return np.zeros(sun_up.shape, dtype=np.float32)
+    sat_up = up_dot(sat)
+    cos_glint = (2 * sun_up * sat_up - sun_up - float(sun @ sat)) / np.sqrt(float(sat @ sat) + 1 - 2 * sat_up)
+    glint = np.degrees(np.arccos(np.clip(cos_glint, -1.0, 1.0)))
+    near = np.clip((GLINT_ANGLE_DEG[1] - glint) / (GLINT_ANGLE_DEG[1] - GLINT_ANGLE_DEG[0]), 0.0, 1.0)
+    day = np.clip(sun_up / np.sin(np.radians(5.0)), 0.0, 1.0)
+    return (GLINT_PENALTY_DEG * near * day).astype(np.float32)
+
+
+def blend(layers: list[tuple[np.ndarray, np.ndarray, np.ndarray]], width: float = SEAM_WIDTH_DEG) -> np.ndarray:
+    """Blend RGBA ``layers`` of ``(view angle, rgba, rank)`` into one RGBA array.
+
+    ``rank`` is the angle the view counts as when the Seam is drawn: the
+    view angle with `glint_penalty` added. Each pixel comes from the
+    satellite of the lowest rank. Where another satellite's rank is within
+    ``width`` degrees of that, the two are feathered into each other. Each
+    one's share also fades out over the last ``LIMB_FADE_DEG`` of its view
+    angle before ``MAX_VIEW_ZENITH_DEG``. A satellite with no data at a pixel
+    takes no part there, so its neighbours fill the gap; one alone at a
+    pixel keeps its colour however small its share.
     """
     best = np.full(layers[0][0].shape, np.inf, dtype=np.float32)
-    for angle, rgba in layers:
-        np.minimum(best, np.where(rgba[3] > 0, angle, np.inf), out=best)
+    for _, rgba, rank in layers:
+        np.minimum(best, np.where(rgba[3] > 0, rank, np.inf), out=best)
     colour = np.zeros((3, *best.shape), dtype=np.float32)
     opacity = np.zeros(best.shape, dtype=np.float32)
     weight = np.zeros(best.shape, dtype=np.float32)
-    for angle, rgba in layers:
-        w = np.clip((best + width - angle) / width, 0.0, 1.0)
+    for angle, rgba, rank in layers:
+        w = np.clip((best + width - rank) / width, 0.0, 1.0)
         w = w * w * (3.0 - 2.0 * w) * np.clip((MAX_VIEW_ZENITH_DEG - angle) / LIMB_FADE_DEG, 1e-3, 1.0)
         w[(rgba[3] == 0) | (angle > MAX_VIEW_ZENITH_DEG)] = 0.0
         wa = w * rgba[3]
@@ -122,7 +177,8 @@ def join_renderings(
     ``renders`` maps each contributing position to its render. A position
     left out is a missing Disk: the others fill what they can see. Beyond
     ``MAX_VIEW_ZENITH_DEG`` a Rendering is smeared along the limb and is left out.
-    Each pixel comes from the satellite that sees it most steeply (``blend``).
+    Each pixel comes from the satellite that sees it most steeply, unless it
+    looks into the sun's reflection there at ``slot`` (``blend``).
     """
     import rasterio
     from rasterio.enums import ColorInterp, Resampling
@@ -138,6 +194,7 @@ def join_renderings(
     lat_all = np.degrees(2 * np.arctan(np.exp(centres / EARTH_RADIUS)) - np.pi / 2)
 
     orbits = {position: satellite_positions(path) for position, path in renders.items()}
+    sun = sun_direction(datetime.fromisoformat(slot))
 
     local = threading.local()
 
@@ -165,16 +222,18 @@ def join_renderings(
         zeniths = {p: np.maximum.reduce([view_zenith(lat, lon, *o) for o in orbits[p]]) for p in renders}
         layers = []
         best = np.full((CHUNK, CHUNK), np.inf, dtype=np.float32)
+        seen = [p for p in renders if zeniths[p].min() < MAX_VIEW_ZENITH_DEG]
         # Steepest view first, so that most chunks read one satellite only.
-        for position in sorted(renders, key=lambda p: zeniths[p].min()):
+        for position in sorted(seen, key=lambda p: zeniths[p].min()):
             zenith = zeniths[position]
-            if zenith.min() >= MAX_VIEW_ZENITH_DEG or (zenith >= best + SEAM_WIDTH_DEG).all():
-                continue  # below the limit, or outside every Seam with a steeper view
+            if (zenith >= best + SEAM_WIDTH_DEG).all():
+                continue  # outside every Seam with a lower rank
+            rank = zenith + glint_penalty(lat, lon, sun, *orbits[position][-1]) if len(seen) > 1 else zenith
             rgba = warped()[position].read(window=window)
             rgba[3][zenith > MAX_VIEW_ZENITH_DEG] = 0
             if rgba[3].any():
-                layers.append((zenith, rgba))
-                np.minimum(best, np.where(rgba[3] > 0, zenith, np.inf), out=best)
+                layers.append((zenith, rgba, rank))
+                np.minimum(best, np.where(rgba[3] > 0, rank, np.inf), out=best)
         if not layers:
             return window, None
         return window, layers[0][1] if len(layers) == 1 else blend(layers)

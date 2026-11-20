@@ -16,9 +16,11 @@ band. So:
   actually was and from its grid (the larger of the two), feathered over 5°
   at every Seam. Meteosat-9 takes 23 to 93°E, 19% of the Earth. Its Seams lie
   halfway to MTG-I1 and to Himawari, where both see the ground at the same
-  angle, under 45° near the equator: neither shows its limb there, and a sun
-  glint, which lies halfway between the sun and each satellite, is matched
-  on both sides.
+  angle, under 45° near the equator: neither shows its limb there. A sun
+  glint, which lies halfway between the sun and each satellite, is not
+  matched on both sides: since 2026-11-20 a view into it counts as up to
+  20° more slanted, so that the neighbour without it takes the Seam (the
+  plan, "Glint at a Seam").
 - **Its blue and green are looked up in a table of its neighbours' colour**,
   made by `georing-fit-colour` from what Meteosat-9 and MTG-I1 see of the
   same ground at the same time over Africa, Arabia and the western Indian
@@ -75,8 +77,10 @@ band. So:
 - East Africa, Arabia and India are in Meteosat-9's colour looked up from
   MTG-I1's, at 3 km, where MTG-I1 saw them in real colour at 0.5 to 1 km.
   Sharpness steps down at its Seams.
-- The join has no satellite-specific numbers: the view angle, one Seam width
-  and the limb.
+- The join has no satellite-specific numbers: the view angle, one Seam width,
+  the limb and the glint penalty. Unlike the glare penalty below, that one
+  is half as large, rises over 15° of glint angle and takes no account of
+  the view angle, and on the Atlantic at 18:00 it drew no line.
 - The colour table is a file of the Recipe,
   `src/georing/satpy/seviri_colour.npz`. Remaking it needs the Disks of both
   satellites for its Slots; the tool and how it is called are in the notes.

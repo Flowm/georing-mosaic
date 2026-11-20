@@ -87,7 +87,7 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
 - **Seam:** a feathered band, written in our own code. satpy's multi-scene
   blend is experimental and a wide weighted average shows high clouds twice.
   A pixel comes from the satellite that sees it most steeply, by the view
-  angle alone (ADR 0005), so the Seams lie halfway between the satellites,
+  angle (ADR 0005), so the Seams lie halfway between the satellites,
   where both see the ground at about the same angle. The band is where the
   two view angles differ by less than 5°, about 470 km on the ground between
   the two GOES. The width was chosen on the
@@ -97,6 +97,16 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   by day); 5° is the narrowest that turns each into a gradient; at 10° cloud
   is plainly doubled, most of all at 70°E. The mean gradient in the band falls
   to 0.92–0.97 of its value at 0.5° with 5°, and to 0.83–0.93 with 10°.
+- **Glint at a Seam:** where a satellite looks into the sun's reflection on
+  the sea, its view counts as up to 20° more slanted when the Seam is drawn:
+  20° within a glint angle of 30°, fading to none at 45°, and only with the
+  sun up. Each satellite sees its glint in another place, and halfway
+  between two of them one often does: GOES-East's at the GOES Seam at
+  21:00, MTG-I1's off Brazil at 18:00, Meteosat-9's south of India at 01:00
+  (2026-11-19/20). The Seam cut each patch off in a straight line; now the
+  neighbour without glint takes the place, and where none sees it better the
+  glint stays. It moves 1–3% of the Earth seen to a view up to 20° more
+  slanted. The measurements are in the notes, under "satpy".
 - **Limb:** a Rendering is not used where its satellite is more than 85° from
   vertical. Beyond that the pixels are smeared streaks. Its share fades out
   over the last 5° before that, so that where a neighbour takes over there
@@ -359,7 +369,8 @@ reading".
   contribute.
 - **The two sides of a Seam differ in colour.** The 5° feather turns the line
   into a gradient; the difference itself remains. Off Brazil at 18:00
-  Meteosat's side of the sea is grey-beige and GOES-East's blue; at the date
+  Meteosat's side of the sea was grey-beige and GOES-East's blue, until the
+  Seam gave way to glint (above); at the date
   line at dawn Himawari's side is grey and GOES-West's blue; at 70°E, viewed
   at a low angle from both sides, haze differed by day until Meteosat-9 came
   between them. Each satellite looks at

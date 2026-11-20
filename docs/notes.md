@@ -894,6 +894,29 @@ the high-cloud layer can ignore.
   steeply. The glare penalty tried before it (ADR 0005, considered options),
   which cost 0.03 s per chunk and satellite: at 18:00 on 2026-11-17 it
   drew the GOES-East and MTG-I1 Seam as a hard line over the Atlantic.
+- Glint cut off at a Seam, 2026-11-19/20: GOES-East's grey glint centred on
+  the GOES Seam at 106°W at 21:00, MTG-I1's grey-beige band off Brazil at
+  18:00 and Meteosat-9's beige disk south of India at 01:00, each ending in
+  a straight line where the neighbour's sea is blue. On clear sea at 21:00
+  the darkest tenth of GOES-East's pixels reads 98 levels within a glint
+  angle of 5°, 75 at 15–20°, 47 at 20–25°, 29 at 25–30°, 20 at 30–35° and
+  7 beyond 40°; GOES-West's 110, 77, 59, 39, 28 and 25: glint shows to
+  about 35°. A satellite's view now counts as up to 20° more slanted at the
+  Seam, full within 30° of glint, none beyond 45°, faded in over the sun's
+  first 5° above the horizon. Joined from the real Renderings, all three
+  patches give way to the neighbour's blue sea with no line (10° left the
+  cut, 30° from 30–45° also took the faint rim). Over the Earth seen at
+  0.1°, every three hours on 2026-11-19, it moves 1.0–2.9% to a view more
+  than 0.5° slanted and 0.1–1.0% more than 10°. The feather narrows where the glint's rise
+  adds to the view angle's: under 150 km on up to 4% of the Seams'
+  length, 98 km at the narrowest, against 254 km at the 5th percentile
+  without; no line showed in the three Joins. A ramp of 25–50° or 20–55°
+  narrows it as much. The glint angle, from the sun's direction (pyorbital)
+  and the satellite's actual position on a sphere, agrees with the
+  Recipe's to 0.02°. It is worked out only where the sun is up and more
+  than one satellite sees the chunk, at 0.5 s and 170 MB a chunk: the whole
+  21:00 Slot, five Renderings on 32 threads, joined in 267 s against 265
+  without it.
 
 **Output**
 - The `geotiff` writer takes `driver="COG"` and passes GDAL's COG options

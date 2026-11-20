@@ -1,16 +1,16 @@
 import numpy as np
 import pytest
 
-from georing.mosaic import blend, view_zenith
+from georing.mosaic import blend, glint_penalty, sun_direction, view_zenith
 
 HEIGHT = 35786023.0
 EAST, WEST = -75.2, -137.0
 
 
-def layer(colour: int, zenith: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def layer(colour: int, zenith: np.ndarray, penalty: float = 0.0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     rgba = np.zeros((4, *zenith.shape), dtype=np.uint8)
     rgba[0], rgba[3] = colour, 255
-    return zenith, rgba
+    return zenith, rgba, zenith + penalty
 
 
 def test_view_zenith_is_zero_below_the_satellite_and_90_at_the_limb():
@@ -70,6 +70,32 @@ def test_a_satellite_crossing_its_limit_leaves_no_step_in_colour():
     assert np.abs(np.diff(out)).max() <= 5
 
 
+def test_a_view_into_the_suns_reflection_gives_way_to_a_neighbour_without():
+    steep, shallow = np.full((1, 1), 30.0, np.float32), np.full((1, 1), 45.0, np.float32)
+    assert blend([layer(200, steep, penalty=20.0), layer(100, shallow)])[0, 0, 0] == 100
+    # Alone, the satellite keeps its glint.
+    assert blend([layer(200, steep, penalty=20.0)])[0, 0, 0] == 200
+
+
+def test_the_sun_stands_over_the_tropic_of_capricorn_in_december():
+    from datetime import datetime
+
+    sun = sun_direction(datetime.fromisoformat("2026-12-21T12:00:00+00:00"))
+    assert np.degrees(np.arcsin(sun[2])) == pytest.approx(-23.4, abs=0.1)
+    assert np.degrees(np.arctan2(sun[1], sun[0])) == pytest.approx(0.0, abs=1.0)  # noon at Greenwich
+
+
+def test_the_glint_penalty_is_full_at_the_suns_reflection_and_none_far_from_it_or_at_night():
+    from datetime import datetime
+
+    sun = sun_direction(datetime.fromisoformat("2026-03-20T12:00:00+00:00"))  # overhead at 0 N, 0 E
+    lat, lon = np.array([0.0]), np.array([0.0, 60.0, 180.0])
+    # Seen from overhead: the reflection; from 60 E: far off it; at 180 E it is night.
+    penalty = glint_penalty(lat, lon, sun, 0.0, HEIGHT)[0]
+    assert penalty[0] == pytest.approx(20.0)
+    assert penalty[1] == 0.0 and penalty[2] == 0.0
+
+
 def test_a_pixel_no_satellite_sees_stays_transparent():
     empty = layer(200, np.full((1, 1), 20.0, np.float32))
     empty[1][3] = 0
@@ -112,7 +138,8 @@ def test_two_disks_are_joined_at_their_seam_and_published_on_the_web_tile_grid(t
         "goes-west": write_render(tmp_path / "west.tif", WEST, 100),
     }
     joined = str(tmp_path / "joined.tif")
-    join_renderings(renders, joined, slot="2026-11-10T18:00:00+00:00", threads=2, zoom=3)
+    # Night over the Pacific, so that no glint moves the Seam.
+    join_renderings(renders, joined, slot="2026-11-10T06:00:00+00:00", threads=2, zoom=3)
 
     with rasterio.open(joined) as src:
         assert src.tags()["GEORING_DISKS"] == "goes-east,goes-west"
