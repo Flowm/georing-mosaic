@@ -259,6 +259,18 @@ pyspectral 0.14.3 and pyorbital 1.14.0.
   kept under `<work_dir>/grids/`; the land mask takes about 3 s and is warped
   for every render. The night layer's clouds are therefore 2 km data for GOES
   and Himawari and 1 km for Meteosat, as the infrared bands are.
+- satpy's background compositor fills the clouds everywhere, so where a
+  satellite scanned no infrared the night layer was the city lights alone,
+  opaque. Meteosat-9's scans miss rows at both ends of its grid: on
+  2026-11-19 it holds data in rows 52–3639 of 3712 at 21:00, 75–3658 at
+  03:00 and 57–3658 at 00:00. At 21:00 its infrared ends at 72.7°N, where
+  its 85° limit lies near 76.5°N, and from 15:00 on every evening Slot was
+  flat black, (8, 8, 8) at full opacity, over 20–70°E north of about 73°N.
+  The night layer is now missing where the 10.4 µm band is: in the 21:00
+  Rendering 65,000 pixels turned transparent, rows 3640–3659 and the rest
+  of the rim, north and south, all seen beyond 81° (median 86°). Only MTG-I1
+  sees part of it within 85°, west of about 35°E and south of 74°N; the rest
+  joins the polar gap.
 - [Issue #3397](https://github.com/pytroll/satpy/issues/3397) proposes a
   different sun-angle correction for the built-in composites, so the look may
   change between releases.

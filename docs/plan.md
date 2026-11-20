@@ -111,7 +111,11 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   grid's what its grid does not hold. The limit was tuned on
   real images like the Seam. Without Meteosat-9 this opens a gap around 70°E
   poleward of about 45° latitude; with it the gap there begins near 70°.
-  Poleward of 76.5° no geostationary satellite sees any longitude.
+  Poleward of 76.5° no geostationary satellite sees any longitude. Where a
+  satellite scanned nothing its Rendering is transparent, by night too, so a
+  neighbour or the gap shows: Meteosat-9's scans miss rows at the ends of
+  its grid, and its night layer drew them as opaque black (the notes, under
+  "satpy").
 - **Deadline:** a Slot builds as soon as all its Disks are present, typically
   from 14 minutes past the hour. At 35 minutes past it builds without any Disk
   still missing. The measurement behind 35 is in the notes, under "Arrival

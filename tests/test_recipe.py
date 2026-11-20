@@ -196,3 +196,29 @@ def test_a_low_sun_glares_where_the_view_is_near_its_reflection():
                 sun=(65, 75), angle=(20, 40))
     # A high sun; halfway down; low; low but further off; low and far off.
     np.testing.assert_allclose(out, [0.0, 0.5, 1.0, 0.5, 0.0])
+
+
+def test_the_night_layer_is_missing_where_the_satellite_scanned_no_infrared(monkeypatch):
+    from pyresample.geometry import AreaDefinition
+    from satpy.composites import fill
+
+    from georing.recipe import SeenBackground
+
+    monkeypatch.setattr(fill, "enhance2dataset", lambda data, *a, **k: data)  # layers come in enhanced
+    area = AreaDefinition("row", "", "", "EPSG:4326", 3, 1, (0, -0.5, 3, 0.5))
+
+    def layer(values, bands):
+        data = np.array(values, dtype=np.float64).T[:, None, :]
+        out = xr.DataArray(da.from_array(data), dims=("bands", "y", "x"), coords={"bands": list(bands)},
+                           attrs={"area": area})
+        out.attrs["mode"] = bands
+        return out
+
+    # Clear sky (transparent cloud) over the lights, all three pixels; satpy fills the clouds everywhere.
+    clouds = layer([[0.0, 0.0]] * 3, "LA")
+    lights = layer([[0.2, 0.2, 0.2]] * 3, "RGB")
+    infrared = xr.DataArray(da.from_array(np.array([[250.0, np.nan, 280.0]])), dims=("y", "x"),
+                            attrs={"area": area})
+    out = SeenBackground("georing_night")([clouds, lights, infrared]).values[:, 0, :]
+    np.testing.assert_allclose(out[:, 0], [0.2, 0.2, 0.2])  # the lights show under clear sky
+    assert np.isnan(out[:, 1]).all()  # no infrared, no night layer: a neighbour may fill it

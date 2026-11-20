@@ -68,12 +68,15 @@ composites:
   # infrared grid, where they are made, and come up to the finest grid as one
   # layer; only there do they meet the lights, which stay at 500 m. Made
   # there from three layers, the night layer took a render twice the memory.
+  # Where the satellite scanned no infrared the layer is missing, not the
+  # lights alone (SeenBackground).
   georing_night:
-    compositor: !!python/name:satpy.composites.fill.BackgroundCompositor
+    compositor: !!python/name:georing.recipe.SeenBackground
     standard_name: night_ir_with_background
     prerequisites:
       - georing_night_clouds
       - georing_city_lights
+      - wavelength: 10.4
 
   # High cloud over low cloud, with the opacity of both.
   georing_night_clouds:

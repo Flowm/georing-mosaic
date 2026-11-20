@@ -12,7 +12,7 @@ from pathlib import Path
 import dask.array as da
 import numpy as np
 from satpy.composites.core import GenericCompositor
-from satpy.composites.fill import DayNightCompositor
+from satpy.composites.fill import BackgroundCompositor, DayNightCompositor
 
 
 def colour_from_table(bands: np.ndarray, centres: np.ndarray, table: np.ndarray) -> np.ndarray:
@@ -110,6 +110,24 @@ class ColourTable(GenericCompositor):
         grey = capped_sun_correction(projectables[3].data, sunz.data, self.grey_sun_cap)
         rgb = [projectables[0].copy(data=toward_grey(colour[i], grey, fade)) for i in range(3)]
         return super().__call__(rgb, **attrs)
+
+
+class SeenBackground(BackgroundCompositor):
+    """satpy's background compositor, but missing wherever a third prerequisite, a band, is.
+
+    The night layer lays the infrared clouds over the city lights, which
+    cover every pixel the grid can see. Where the satellite scanned no
+    infrared, the lights alone would be drawn there, opaque, and hide the
+    neighbour that did see it: Meteosat-9's scans stop rows short of its
+    northern limb, and at night that left a black lens over the Barents
+    Sea. The clouds cannot say where that is, as satpy's compositing fills
+    them everywhere; the infrared band they are made from can.
+    """
+
+    def __call__(self, projectables, *args, **kwargs):
+        projectables = self.match_data_arrays(projectables)
+        seen = projectables[2].notnull()
+        return super().__call__(projectables[:2], *args, **kwargs).where(seen)
 
 
 def twilight(day, night, sunz, weight, gain, offset, start, end, gamma=2.2):
