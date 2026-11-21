@@ -106,7 +106,14 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   (2026-11-19/20). The Seam cut each patch off in a straight line; now the
   neighbour without glint takes the place, and where none sees it better the
   glint stays. It moves 1–3% of the Earth seen to a view up to 20° more
-  slanted. The measurements are in the notes, under "satpy".
+  slanted. A Seam moved by glint lies in the glint, and the 5° feather drew
+  a soft straight edge across it (172°E at 22:00 and 28°W at 16:00 on
+  2026-11-20). There the neighbour without glint feathers into the glinting
+  view over 1° more per degree of penalty between them, and a view's weight
+  falls to 0.2 at the full penalty: the glint fades out over about 8° of
+  longitude. Only the neighbour's side widens, so no glint comes back where
+  the neighbour took the place. The measurements are in the notes, under
+  "satpy".
 - **Limb:** a Rendering is not used where its satellite is more than 85° from
   vertical. Beyond that the pixels are smeared streaks. Its share fades out
   over the last 5° before that, so that where a neighbour takes over there

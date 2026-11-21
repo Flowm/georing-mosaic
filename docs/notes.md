@@ -917,6 +917,25 @@ the high-cloud layer can ignore.
   than one satellite sees the chunk, at 0.5 s and 170 MB a chunk: the whole
   21:00 Slot, five Renderings on 32 threads, joined in 267 s against 265
   without it.
+- Glint edge at a moved Seam, 2026-11-20: in the published Slots the moved
+  Seam lies in the glint, and the 5° feather drew a soft straight edge across
+  it. Clear sea (the 20th percentile of 1° columns, 4–16°S) at 22:00 fell
+  from 112 levels at 169°E to 34 at 174°E, 25 in the steepest degree, where
+  Himawari's glint met GOES-West; at 16:00 a band of MTG-I1's glint began at
+  28°W. Widening only the clear neighbour's feather, by 1° per degree of
+  penalty between the two, took the glint down gradually but left that
+  steepest degree: at equal rank the two still split the pixel evenly.
+  Dropping a glinting view's weight with its penalty as well, to 0.2 at the
+  full penalty, moves most of the pixel to the neighbour there: the steepest
+  degree fell to 14 levels at 22:00 (to 15 with 0.5) and from 20 to 8 on the
+  GOES Seam at 21:00 on 2026-11-19, and by eye the edges are gone. Clouds in
+  the wider feather show faint ghosts at full resolution, none doubled: one
+  view carries most of each pixel. Widening the glinting view's side as
+  well, by half as much, would by the weights (not joined) give the glint
+  about 40% of the pixel at its centre, where the neighbour took the place. The whole 21:00 Slot changed by more than 2 levels on 1.2% of the
+  Earth seen, all near glint, and joined in 302 s against 265: the penalty
+  is now worked out for every satellite that sees a chunk, and a Seam may
+  reach 25° of view angle where there is glint.
 
 **Output**
 - The `geotiff` writer takes `driver="COG"` and passes GDAL's COG options

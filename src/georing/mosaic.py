@@ -30,6 +30,12 @@ LIMB_FADE_DEG = 5.0
 # Seam. Full within the first glint angle, none beyond the second; see the plan.
 GLINT_PENALTY_DEG = 20.0
 GLINT_ANGLE_DEG = (30.0, 45.0)
+# Where glint moved the Seam it lies in the glint, and a 5-degree feather drew
+# an edge across it. There a neighbour without glint feathers into the glinting
+# view over this many more degrees per degree of penalty, and a view at the
+# full penalty keeps this much of its weight: the glint fades out instead.
+GLINT_FEATHER = 1.0
+GLINT_WEIGHT = 0.2
 # WebP quality of the published Mosaic (ADR 0004).
 QUALITY = 90
 CHUNK = 2048
@@ -112,21 +118,30 @@ def blend(layers: list[tuple[np.ndarray, np.ndarray, np.ndarray]], width: float 
     ``rank`` is the angle the view counts as when the Seam is drawn: the
     view angle with `glint_penalty` added. Each pixel comes from the
     satellite of the lowest rank. Where another satellite's rank is within
-    ``width`` degrees of that, the two are feathered into each other. Each
-    one's share also fades out over the last ``LIMB_FADE_DEG`` of its view
+    ``width`` degrees of that, the two are feathered into each other. Where
+    the lowest rank carries more glint penalty than another, that one reaches
+    ``GLINT_FEATHER`` degrees further per degree of the difference, and each
+    view's weight drops toward ``GLINT_WEIGHT`` with its penalty. Each one's
+    share also fades out over the last ``LIMB_FADE_DEG`` of its view
     angle before ``MAX_VIEW_ZENITH_DEG``. A satellite with no data at a pixel
     takes no part there, so its neighbours fill the gap; one alone at a
     pixel keeps its colour however small its share.
     """
     best = np.full(layers[0][0].shape, np.inf, dtype=np.float32)
-    for _, rgba, rank in layers:
-        np.minimum(best, np.where(rgba[3] > 0, rank, np.inf), out=best)
+    best_penalty = np.zeros(best.shape, dtype=np.float32)
+    for angle, rgba, rank in layers:
+        lower = (rgba[3] > 0) & (rank < best)
+        best[lower] = rank[lower]
+        best_penalty[lower] = (rank - angle)[lower]
     colour = np.zeros((3, *best.shape), dtype=np.float32)
     opacity = np.zeros(best.shape, dtype=np.float32)
     weight = np.zeros(best.shape, dtype=np.float32)
     for angle, rgba, rank in layers:
-        w = np.clip((best + width - rank) / width, 0.0, 1.0)
+        penalty = rank - angle
+        reach = width + GLINT_FEATHER * np.maximum(best_penalty - penalty, 0.0)
+        w = np.clip((best + reach - rank) / reach, 0.0, 1.0)
         w = w * w * (3.0 - 2.0 * w) * np.clip((MAX_VIEW_ZENITH_DEG - angle) / LIMB_FADE_DEG, 1e-3, 1.0)
+        w *= 1.0 - (1.0 - GLINT_WEIGHT) * penalty / GLINT_PENALTY_DEG
         w[(rgba[3] == 0) | (angle > MAX_VIEW_ZENITH_DEG)] = 0.0
         wa = w * rgba[3]
         colour += wa * rgba[:3]
@@ -223,12 +238,20 @@ def join_renderings(
         layers = []
         best = np.full((CHUNK, CHUNK), np.inf, dtype=np.float32)
         seen = [p for p in renders if zeniths[p].min() < MAX_VIEW_ZENITH_DEG]
+        if not seen:
+            return window, None
+        if len(seen) == 1:
+            penalties = {seen[0]: np.float32(0.0)}
+        else:
+            penalties = {p: glint_penalty(lat, lon, sun, *orbits[p][-1]) for p in seen}
+        # How far a Seam reaches here at most (blend).
+        reach = SEAM_WIDTH_DEG + GLINT_FEATHER * np.maximum.reduce(list(penalties.values()))
         # Steepest view first, so that most chunks read one satellite only.
         for position in sorted(seen, key=lambda p: zeniths[p].min()):
             zenith = zeniths[position]
-            if (zenith >= best + SEAM_WIDTH_DEG).all():
+            rank = zenith + penalties[position]
+            if (rank >= best + reach).all():
                 continue  # outside every Seam with a lower rank
-            rank = zenith + glint_penalty(lat, lon, sun, *orbits[position][-1]) if len(seen) > 1 else zenith
             rgba = warped()[position].read(window=window)
             rgba[3][zenith > MAX_VIEW_ZENITH_DEG] = 0
             if rgba[3].any():

@@ -77,6 +77,19 @@ def test_a_view_into_the_suns_reflection_gives_way_to_a_neighbour_without():
     assert blend([layer(200, steep, penalty=20.0)])[0, 0, 0] == 200
 
 
+def test_where_glint_moved_the_seam_the_glint_fades_out_instead_of_ending_at_an_edge():
+    def red(glint_zenith: float, clear_zenith: float) -> int:
+        glint = layer(200, np.full((1, 1), glint_zenith, np.float32), penalty=20.0)
+        return int(blend([glint, layer(100, np.full((1, 1), clear_zenith, np.float32))])[0, 0, 0])
+
+    # Where the ranks are equal, the view without glint already counts most.
+    assert red(30.0, 50.0) == 117
+    # Ahead by twice the Seam width, the glinting view still shares the pixel.
+    assert 100 < red(30.0, 60.0) < 200
+    # Where the view without glint ranks lower, the glint stays out as before.
+    assert red(30.0, 44.0) == 100
+
+
 def test_the_sun_stands_over_the_tropic_of_capricorn_in_december():
     from datetime import datetime
 
