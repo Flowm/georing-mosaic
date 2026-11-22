@@ -65,8 +65,9 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   FCI's tone curves (ADR 0005). Where the table never saw the bands the
   colour fades to a neutral grey: from a view of 58° to 66°, a sun of 80° to
   88°, the brightest band from 110 to 130%, and over water a glint angle
-  from 22° to 12°. Before that, cloud and haze lose their tint, keeping
-  their brightness, as the sun goes from 64° to 76°. The grey is the uncorrected
+  from 22° to 12°. Before that, cloud and haze over water lose their tint,
+  keeping their brightness, as the sun goes from 64° to 76°; over land it
+  greyed bright desert and hazy fields too. The grey is the uncorrected
   0.8 µm band divided by the sun taken no lower than 60°. By night its low-cloud ramp starts 2.6 K
   higher over land and 3.3 K over sea than the other sensors': SEVIRI's
   10.8 − 3.9 µm difference runs that much above FCI's over the same clear

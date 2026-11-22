@@ -34,6 +34,11 @@ composites:
   # (2026-11-20 01:00, the southern Indian Ocean at dawn: the brightest
   # tenth of cloud 14 to 24 levels redder than blue at 70 to 84 degrees, at
   # most 5 after), where CIRA's is grey. dusk-seviri moves from 9.7 to 9.6.
+  # Over water only: bright desert and hazy land lost their colour with it,
+  # Arabia at 04:00 and India at 02:00 on 2026-11-22 a bright grey where the
+  # table, untouched, gives them the colour they show by day. Bright cloud
+  # over land keeps its own, nearly grey: under a sun of 60 to 80 degrees
+  # its median red is 1.0 to 1.5% above its blue.
   georing_day:
     compositor: !!python/name:georing.recipe.ColourTable
     standard_name: georing_day

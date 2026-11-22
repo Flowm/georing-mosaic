@@ -255,3 +255,14 @@ def test_a_colour_loses_its_tint_and_keeps_its_brightness():
     np.testing.assert_allclose(untinted(salmon, 0.0), salmon)
     np.testing.assert_allclose(untinted(salmon, 1.0), [33.0, 33.0, 33.0])
     assert untinted(salmon, 0.5).mean() == pytest.approx(salmon.mean())
+
+
+def test_under_a_low_sun_only_bright_pixels_over_water_lose_their_tint():
+    from georing.recipe import low_sun_tint
+
+    sun, bright = (64, 76), (10, 20)
+    # Cloud over the sea, desert, the same cloud under a high sun, dark sea.
+    sunz = np.array([80.0, 80.0, 50.0, 80.0])
+    brightness = np.array([30.0, 30.0, 30.0, 5.0])
+    water = np.array([1.0, 0.0, 1.0, 1.0])
+    np.testing.assert_allclose(low_sun_tint(sunz, brightness, water, sun, bright), [1.0, 0.0, 0.0, 0.0])

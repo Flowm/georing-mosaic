@@ -764,6 +764,31 @@ the dusk sea where MTG-I1 keeps it blue. dusk-seviri went from 9.7, 10.9,
 12.5 to 9.6, 10.9, 12.5; day-seviri, snow-seviri, glint-seviri and
 h-day-seviri, under a higher sun, are unchanged.
 
+Since 2026-11-22 that fade acts over water only. Over land it greyed the
+dawn: on 2026-11-22 India at 02:00 and Arabia at 04:00 were a bright,
+colourless sheet in the Mosaic, display level about 150 with a chroma of 3
+to 5 under a sun of 72–80°, where CIRA's Meteosat-9 shows 56–86 with 6 to
+21. Under a low sun the corrected bands of desert and hazy fields rise as
+cloud's do (the table's mean colour over land from 16% at 60° to 34% at
+78°), and the fade took 55–87% of India's tint at 02:00 and half of
+Arabia's at 04:00; the other fades hardly touch that land before 80°.
+Untouched, the table gives Arabia's desert at 04:00 (sun 77°) 172, 146,
+123, its colour at 06:00 (172, 147, 123). Two ways to tell the cloud the
+fade is for from such land, by SEVIRI's bands under a sun of 60–80°:
+1.6/0.8 µm is 1.19–1.38 over Arabia's desert (5th to 95th percentile),
+0.71–1.05 over the salmon cloud of 2026-11-16 01:00 and 0.15–0.99 over
+cloud on land, but 0.45–1.03 over India's hazy fields, so it would spare the
+desert only; the land mask spares both. Bright cloud over land keeps a
+near-grey colour from the table (median red 1.0 to 1.5% above blue). On
+2026-11-16 01:00, 1 of 1.58 million pixels moves by more than 2 levels.
+Pixels of the full Recipe moved by more than 8 levels over 35–100°E,
+2–40°N: 4.2% at 02:00, 2.6% at 03:00, 10.3% at 04:00.
+India at 03:00 is still pale: under a sun of 60–72° its colour is CIRA's (a
+blue-green haze; over central India G−R +8, B−R +2 against +10, +6) but
+about 40 levels brighter (116–124 against 73–85), and brighter than ours at
+a high sun. No fade acts there; it is the table's colour of November's haze
+under a low sun.
+
 By night, SEVIRI's 10.8 − 3.9 µm difference runs higher than FCI's
 10.5 − 3.8 µm over the same ground at the same time. Medians on the same
 grid at 2026-11-10 00:00, where FCI's 10.5 µm reads 285–295 K: 2.6 K over

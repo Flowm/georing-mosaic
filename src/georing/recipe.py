@@ -47,6 +47,17 @@ def untinted(colour, fade):
     return mean + (colour - mean) * (1 - fade)
 
 
+def low_sun_tint(sunz, brightness, water, sun, bright):
+    """Return how much of its tint, from 0 to 1, a looked-up colour loses under a low sun.
+
+    It rises as the sun zenith ``sunz`` goes from ``sun[0]`` to ``sun[1]``
+    degrees, times as the colour's mean ``brightness`` goes from
+    ``bright[0]`` to ``bright[1]`` percent, times the share of ``water``
+    (0 to 1): cloud and haze over the sea lose it, dark sea and land keep it.
+    """
+    return _ramp(sunz, sun) * _ramp(brightness, bright) * water
+
+
 def _ramp(value, limits):
     """Return 0 at ``limits[0]`` and below, 1 at ``limits[1]`` and above, linear between."""
     return ((value - limits[0]) / (limits[1] - limits[0])).clip(0, 1)
@@ -86,11 +97,11 @@ class ColourTable(GenericCompositor):
     degrees to all at ``glint_angle[0]``; the fifth band is the land mask (0
     water, 100 land). The grey is the fourth band, the uncorrected 0.8 um
     one, divided by the sun as if it stood no lower than ``grey_sun_cap``.
-    Before that, as the sun zenith goes from ``tint_sun[0]`` to
-    ``tint_sun[1]`` degrees, the colour loses its tint and keeps its
+    Before that, over water, as the sun zenith goes from ``tint_sun[0]``
+    to ``tint_sun[1]`` degrees, the colour loses its tint and keeps its
     brightness (``untinted``): the table was made under a higher sun. Dark
-    pixels keep theirs, cloud and haze lose it, as the colour's mean goes
-    from ``tint_bright[0]`` to ``tint_bright[1]`` percent.
+    sea keeps its tint, cloud and haze lose it, as the colour's mean goes
+    from ``tint_bright[0]`` to ``tint_bright[1]`` percent (``low_sun_tint``).
     The Recipe (``seviri.yaml``) says why each is where it is.
     """
 
@@ -116,11 +127,12 @@ class ColourTable(GenericCompositor):
             colour_from_table, bands, self.centres, self.table, dtype=bands.dtype,
         )
         sat_azimuth, satz, sun_azimuth, sunz = get_angles(projectables[0])
-        colour = untinted(colour, _ramp(sunz.data, self.tint_sun) * _ramp(colour.mean(axis=0), self.tint_bright))
-        fade = distrust(sunz.data, satz.data, bands.max(axis=0), self.sun, self.view, self.reach)
         land = projectables[4].squeeze("bands", drop=True) if "bands" in projectables[4].dims else projectables[4]
+        water = (1 - land.data / 100).clip(0, 1)
+        colour = untinted(colour, low_sun_tint(sunz.data, colour.mean(axis=0), water, self.tint_sun, self.tint_bright))
+        fade = distrust(sunz.data, satz.data, bands.max(axis=0), self.sun, self.view, self.reach)
         glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
-        fade = np.maximum(fade, near_glint(glint, self.glint_angle) * (1 - land.data / 100).clip(0, 1))
+        fade = np.maximum(fade, near_glint(glint, self.glint_angle) * water)
         grey = capped_sun_correction(projectables[3].data, sunz.data, self.grey_sun_cap)
         rgb = [projectables[0].copy(data=toward_grey(colour[i], grey, fade)) for i in range(3)]
         return super().__call__(rgb, **attrs)
