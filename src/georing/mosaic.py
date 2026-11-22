@@ -172,12 +172,20 @@ def satellite_positions(path: str) -> list[tuple[float, float, float]]:
     import rasterio
 
     with rasterio.open(path) as src:
-        tags = src.tags()
-        proj = src.crs.to_dict()
+        return positions_from(src.crs.to_dict(), src.tags())
+
+
+def positions_from(proj: dict, tags: dict[str, str]) -> list[tuple[float, float, float]]:
+    """Return `satellite_positions` from a grid's projection and the tags a render writes (``POSITION_TAGS``)."""
     positions = [(proj["lon_0"], proj["h"], 0.0)]
     if all(tag in tags for tag in POSITION_TAGS):
         positions.append(tuple(float(tags[tag]) for tag in POSITION_TAGS))
     return positions
+
+
+def view_angle(lat: np.ndarray, lon: np.ndarray, positions: list[tuple[float, float, float]]) -> np.ndarray:
+    """Return the view angle the join counts a satellite at: the largest from its ``positions`` (`view_zenith`)."""
+    return np.maximum.reduce([view_zenith(lat, lon, *position) for position in positions])
 
 
 def join_renderings(
@@ -234,7 +242,7 @@ def join_renderings(
         row, col = origin
         window = Window(col, row, CHUNK, CHUNK)
         lat, lon = lat_all[row : row + CHUNK], lon_all[col : col + CHUNK]
-        zeniths = {p: np.maximum.reduce([view_zenith(lat, lon, *o) for o in orbits[p]]) for p in renders}
+        zeniths = {p: view_angle(lat, lon, orbits[p]) for p in renders}
         layers = []
         best = np.full((CHUNK, CHUNK), np.inf, dtype=np.float32)
         seen = [p for p in renders if zeniths[p].min() < MAX_VIEW_ZENITH_DEG]

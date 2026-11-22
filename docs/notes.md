@@ -619,6 +619,12 @@ Recipe's green and blue, Rayleigh-corrected) and SEVIRI's VIS006
 both satellites see within 65° of vertical, with the sun within 70° of
 overhead, whose 3 by 3 neighbourhood varies by less than 1.5% reflectance or
 10% of its own, in both. That leaves 1.9 million cells from the five Slots.
+Since 2026-11-22 the view angles are those the join counts, from where each
+satellite was: on 2026-09-20 at 09:00 Meteosat-9 stood at 7.6°N, and 9% fewer
+of its cells over MTG-I1's overlap are within 65° than with it on the
+equator. The table in use was made before that and has not been made again.
+The cells of each Slot are kept under `work/comparison/fit`, named by the
+settings that picked them, so that a change to those picks them again.
 The table has 24 bins per band, in equal steps of the square root of the
 reflectance from 0 to 110%; a bin with 10 cells or more holds their median
 MTG-I1 colour, the rest a cubic polynomial of the three bands fitted on all

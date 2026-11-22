@@ -37,7 +37,6 @@ import numpy as np
 MAX_VIEW_DEG = 65.0
 MAX_SUN_DEG = 70.0
 GRID_DEG = 0.05
-SEVIRI_LON = 45.5
 SEVIRI_BANDS = (
     ("VIS006", ("georing_sunz", "georing_rayleigh")),
     ("VIS008", ("georing_sunz",)),
@@ -61,8 +60,8 @@ DEGREE = 3
 TABLE = Path(__file__).parent / "satpy" / "seviri_colour.npz"
 RAYLEIGH = ("georing_sunz", "georing_rayleigh")
 CLEAR_LAND = 40.0
-# Each neighbour: where it overlaps Meteosat-9 (west, south, east, north), its
-# longitude, its red, green and blue before the enhancement, how to load them,
+# Each neighbour: where it overlaps Meteosat-9 (west, south, east, north),
+# its red, green and blue before the enhancement, how to load them,
 # and whether only land is learnt from it. Himawari sees its overlap 50-65
 # degrees off vertical, through more haze than MTG-I1: learnt from, its sea
 # turned Meteosat-9's a blotchy grey, and its cloud, blue. Its clear land
@@ -70,9 +69,9 @@ CLEAR_LAND = 40.0
 # under the morning sun India is seen in; MTG-I1's sea in the morning, low
 # and slantwise over the western Indian Ocean, made the sea blotchy too.
 NEIGHBOURS = {
-    "meteosat-0": ((-15.0, -55.0, 60.0, 55.0), 0.0,
+    "meteosat-0": ((-15.0, -55.0, 60.0, 55.0),
                    (("vis_06", RAYLEIGH), ("georing_green", None), ("vis_04", RAYLEIGH)), {"resolution": 1000}, False),
-    "himawari": ((70.0, -55.0, 125.0, 55.0), 140.7,
+    "himawari": ((70.0, -55.0, 125.0, 55.0),
                  (("B03", RAYLEIGH), ("georing_green", None), ("B01", RAYLEIGH)), {}, True),
 }
 
@@ -91,13 +90,22 @@ def _queries(bands):
     return [DataQuery(name=n, modifiers=m) if m else DataQuery(name=n) for n, m in bands]
 
 
-def _on_grid(position: str, slot: datetime, work: Path, bounds, queries, **load) -> np.ndarray:
-    """Return the datasets ``queries`` of a Disk averaged onto the common grid."""
+def _on_grid(position: str, slot: datetime, work: Path, bounds, queries, **load) -> tuple[np.ndarray, list]:
+    """Return the datasets ``queries`` of a Disk averaged onto the common grid, and where the satellite was.
+
+    Where it was is as the join takes it (``georing.mosaic.satellite_positions``).
+    The first query must be one of the Disk's bands, on its own grid.
+    """
     import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
     from satpy import Scene
 
     from georing.compare import comparison_disk
-    from georing.render import _serialise_netcdf_reads, quiet_known_warnings
+    from georing.mosaic import positions_from
+    from georing.render import (
+        _serialise_netcdf_reads,
+        quiet_known_warnings,
+        satellite_position_tags,
+    )
     from georing.satellites import by_position
 
     _serialise_netcdf_reads()
@@ -106,9 +114,10 @@ def _on_grid(position: str, slot: datetime, work: Path, bounds, queries, **load)
     files = sorted(str(p) for p in disk_dir.iterdir() if not p.name.startswith("."))
     scn = Scene(filenames=files, reader=by_position(position).reader)
     scn.load(queries, **load)
+    positions = positions_from(scn[queries[0]].attrs["area"].crs.to_dict(), satellite_position_tags(scn))
     # The whole Scene must outlive the reads: dropping it closes the FCI files.
     out = scn.crop(ll_bbox=bounds).resample(grid(bounds), resampler="bucket_avg")
-    return np.stack([out[q].values.astype(np.float32) for q in queries])
+    return np.stack([out[q].values.astype(np.float32) for q in queries]), positions
 
 
 def pairs(slot: datetime, work: Path, neighbour: str) -> tuple[np.ndarray, np.ndarray]:
@@ -118,16 +127,18 @@ def pairs(slot: datetime, work: Path, neighbour: str) -> tuple[np.ndarray, np.nd
     """
     from pyorbital.astronomy import sun_zenith_angle
 
-    from georing.mosaic import view_zenith
+    from georing.mosaic import view_angle
 
-    bounds, lon_0, colour, load, land_only = NEIGHBOURS[neighbour]
-    seviri = _on_grid("meteosat-iodc", slot, work, bounds, _queries(SEVIRI_BANDS))
-    theirs = _on_grid(neighbour, slot, work, bounds, _queries(colour), **load)
+    bounds, colour, load, land_only = NEIGHBOURS[neighbour]
+    seviri, seviri_at = _on_grid("meteosat-iodc", slot, work, bounds, _queries(SEVIRI_BANDS))
+    theirs, theirs_at = _on_grid(neighbour, slot, work, bounds, _queries(colour), **load)
     lons, lats = grid(bounds).get_lonlats()
     lat, lon = lats[:, 0], lons[0]
+    # Meteosat-9's inclined orbit takes it several degrees off the equator:
+    # the view angles are those the join counts, from where it was.
     keep = (
-        (view_zenith(lat, lon, lon_0, 35786023.0) < MAX_VIEW_DEG)
-        & (view_zenith(lat, lon, SEVIRI_LON, 35786023.0) < MAX_VIEW_DEG)
+        (view_angle(lat, lon, theirs_at) < MAX_VIEW_DEG)
+        & (view_angle(lat, lon, seviri_at) < MAX_VIEW_DEG)
         & (sun_zenith_angle(slot.replace(tzinfo=None), lons, lats) < MAX_SUN_DEG)
         & np.isfinite(seviri).all(axis=0)
         & np.isfinite(theirs).all(axis=0)
@@ -164,6 +175,19 @@ def _even(band: np.ndarray) -> np.ndarray:
     spread[1:-1, 1:-1] = np.nanmax(windows, axis=(-1, -2)) - np.nanmin(windows, axis=(-1, -2))
     absolute, share = MAX_SPREAD
     return spread < np.maximum(absolute, share * band)
+
+
+def selection() -> str:
+    """Return a short name for the settings that pick the pixel pairs.
+
+    The pairs of each Slot are kept under it, so that pairs picked under
+    other settings are not taken for these. Its last part names how the
+    view angles are worked out (``pairs``).
+    """
+    import hashlib
+
+    settings = (MAX_VIEW_DEG, MAX_SUN_DEG, GRID_DEG, SEVIRI_BANDS, MAX_SPREAD, CLEAR_LAND, NEIGHBOURS, "actual-orbit")
+    return hashlib.sha256(repr(settings).encode()).hexdigest()[:8]
 
 
 def weights(x: np.ndarray) -> np.ndarray:
@@ -259,8 +283,7 @@ def main(argv: list[str] | None = None) -> int:
     data = {}
     for neighbour, slots in learnt.items():
         for slot in [*slots, *args.check]:
-            land = "-clear-land" if NEIGHBOURS[neighbour][4] else ""
-            cache = work / "comparison" / "fit" / f"{slot:%Y%m%dT%H}-{neighbour}{land}.npz"
+            cache = work / "comparison" / "fit" / f"{slot:%Y%m%dT%H}-{neighbour}-{selection()}.npz"
             if not cache.exists():
                 cache.parent.mkdir(parents=True, exist_ok=True)
                 np.savez(cache, *pairs(slot, work, neighbour))
