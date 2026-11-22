@@ -180,7 +180,10 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   bucket credentials and has only those it is handed: the two Meteosat
   downloads and the look-back for late Disks get the EUMETSAT key.
 - **One Disk's failure does not cost the Slot.** A Disk that cannot be
-  downloaded or rendered is left out and recorded as missing.
+  downloaded or rendered is left out and recorded as missing. A Disk the
+  source does not hold by the deadline is to be expected, so its download
+  task ends without failing and the run logs one warning line for it; until
+  2026-11-22 the task failed, and Prefect logged each with a traceback.
 - **Scratch is removed when a run ends,** failed or not. What a run that was
   killed leaves is removed by a later run once nothing has touched it for
   three hours.
@@ -244,7 +247,9 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   so a consumer can tell when the data is stale.
 - **Links are relative** and Items sit beside their products, so the tree can
   be served from any prefix. The layout is in `src/georing/catalogue.py`.
-- **Each Item carries the attribution** its data providers ask for.
+- **Each Item carries the attribution** its data providers ask for, each line
+  once: both Meteosats ask for the same one. Until 2026-11-22 it was listed
+  twice when both contributed.
 - **The catalogue is the record of which Slots are done** (ADR 0003).
 - **The output location is a URL setting,** `output_url`: a path for a host
   directory, the default, or `s3://bucket/prefix` for a bucket (Cloudflare R2
@@ -372,8 +377,6 @@ reading".
   `work/comparison/reference/`. Decide where the Comparison scenes'
   references and Disks are to live, and whether Himawari gets holdout
   scenes again, on a day SLIDER still holds.
-- **The attribution lists the EUMETSAT line twice** when both Meteosats
-  contribute.
 - **The two sides of a Seam differ in colour.** The 5° feather turns the line
   into a gradient; the difference itself remains. Off Brazil at 18:00
   Meteosat's side of the sea was grey-beige and GOES-East's blue, until the

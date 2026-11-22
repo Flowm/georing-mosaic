@@ -2,13 +2,15 @@ sensor_name: visir/seviri
 
 composites:
   # SEVIRI has no blue or green band. Its day colour is looked up in a table
-  # of the colour MTG-I1 shows, before the enhancement, for each combination
-  # of SEVIRI's three day bands, so that Meteosat-9 meets MTG-I1 at a Seam in
-  # one colour and takes FCI's tone curves. georing-fit-colour made the table
-  # from where both satellites see the ground within 65 degrees of vertical
-  # and the sun is within 70 degrees of overhead, on 2026-11-10 at 07:00,
-  # 09:00 and 11:00 and 2026-09-20 at 09:00 and 11:00 UTC (the green Sahel);
-  # 2026-11-10 13:00 was only measured. Where the table is not to be trusted
+  # of the colour its neighbours show, before the enhancement, for each
+  # combination of SEVIRI's three day bands, so that Meteosat-9 meets them at
+  # a Seam in one colour and takes FCI's tone curves. georing-fit-colour made
+  # the table from where Meteosat-9 and a neighbour both see the ground within
+  # 65 degrees of vertical and the sun is within 70 degrees of overhead: MTG-I1
+  # on 2026-11-10 at 07:00, 09:00 and 11:00 and 2026-09-20 at 09:00 and 11:00
+  # UTC (the green Sahel), and Himawari's clear land on six Slots of the same
+  # days (India's crops); 2026-11-10 13:00 and 2026-11-19 05:00 were only
+  # measured (georing.fit, and the notes). Where the table is not to be trusted
   # the colour fades to a neutral grey, over 8 degrees of sun or view and 20%
   # past the table's end: there the bands,
   # divided by a low sun or seen along the limb, reach combinations it never

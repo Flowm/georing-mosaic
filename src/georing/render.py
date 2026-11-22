@@ -19,11 +19,18 @@ KNOWN_WARNINGS = (
     ("invalid value encountered in scalar multiply", "trollimage"),
     ("invalid value encountered in log$", "dask"),
     ("The specified chunks separate the stored chunks", "satpy"),
+    # Meteosat-9: SEVIRI's brightness temperature of a zero radiance, and
+    # satpy's background compositor where both layers are transparent.
+    ("divide by zero encountered in divide", "dask"),
+    ("invalid value encountered in divide", "dask"),
+    # satpy's ratio sharpening, off the Disk.
+    ("invalid value encountered in divide", "satpy"),
+    ("Mean of empty slice", "satpy"),
 )
 KNOWN_LOG_LINES = {
-    "satpy.scene": "The following datasets were not created and may require resampling",
-    "pyspectral.rsr_reader": "No sensor name specified in HDF5 file",
-    "satpy.readers.generic_image": "cannot convert float NaN to integer",
+    "satpy.scene": ("The following datasets were not created and may require resampling",),
+    "pyspectral.rsr_reader": ("No sensor name specified in HDF5 file", "No 'platform_name' in HDF5 file"),
+    "satpy.readers.generic_image": ("cannot convert float NaN to integer",),
 }
 
 
@@ -136,17 +143,17 @@ def _upsampled_chunks(coarse, fine) -> tuple[tuple[int, ...], tuple[int, ...]]:
 
 
 class _Known(logging.Filter):
-    """Drops the lines that start with one text."""
+    """Drops the lines that start with any of some texts."""
 
-    def __init__(self, start: str):
+    def __init__(self, starts: tuple[str, ...]):
         super().__init__()
-        self.start = start
+        self.starts = starts
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return not record.getMessage().startswith(self.start)
+        return not record.getMessage().startswith(self.starts)
 
 
-_KNOWN_FILTERS = {name: _Known(start) for name, start in KNOWN_LOG_LINES.items()}
+_KNOWN_FILTERS = {name: _Known(starts) for name, starts in KNOWN_LOG_LINES.items()}
 
 
 def quiet_known_warnings() -> None:

@@ -14,7 +14,7 @@ band. So:
 - **Each pixel comes from the satellite that sees it most steeply**, as for
   the others: by the view angle alone, worked out from where the satellite
   actually was and from its grid (the larger of the two), feathered over 5°
-  at every Seam. Meteosat-9 takes 23 to 93°E, 19% of the Earth. Its Seams lie
+  at every Seam, and further where glint moved it (the plan, under "Seam"). Meteosat-9 takes 23 to 93°E, 19% of the Earth. Its Seams lie
   halfway to MTG-I1 and to Himawari, where both see the ground at the same
   angle, under 45° near the equator: neither shows its limb there. A sun
   glint, which lies halfway between the sun and each satellite, is not
@@ -78,7 +78,8 @@ band. So:
   MTG-I1's, at 3 km, where MTG-I1 saw them in real colour at 0.5 to 1 km.
   Sharpness steps down at its Seams.
 - The join has no satellite-specific numbers: the view angle, one Seam width,
-  the limb and the glint penalty. Unlike the glare penalty below, that one
+  the limb and the glint penalty, with the feather and weight that go with
+  it (`GLINT_FEATHER`, `GLINT_WEIGHT`). Unlike the glare penalty below, that one
   is half as large, rises over 15° of glint angle and takes no account of
   the view angle, and on the Atlantic at 18:00 it drew no line.
 - The colour table is a file of the Recipe,

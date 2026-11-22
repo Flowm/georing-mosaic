@@ -47,7 +47,7 @@ here; [GLOSSARY.md](GLOSSARY.md) defines them.
 Meteosat-9 covers only the strip around India, about 63 to 75°E, where the
 others view the ground at about 80° from vertical. Its imager is 3 km and has
 no blue or green band, so its day colour is looked up in a table of what
-MTG-I1 shows of the same ground.
+MTG-I1 and Himawari show of the same ground.
 
 Each Slot uses the scan that starts on the hour. The scans arrive between 11
 and about 15 minutes past, Meteosat's sometimes near 30 past. A Slot is built
@@ -114,7 +114,7 @@ uv run pytest
 uv run ruff check
 ```
 
-The tests fake the heavy steps, so they run in about a minute. To build a
+The tests fake the heavy steps, so they run in two to three minutes. To build a
 real Slot from a shell, with the same flow and a temporary Prefect server of
 its own, and to judge the look against CIRA's GeoColor on fixed scenes:
 

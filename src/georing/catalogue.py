@@ -66,7 +66,8 @@ def mosaic_item(slot: datetime, disks: list[str], missing: list[str]) -> dict:
             "created": _iso(datetime.now(UTC)),
             "georing:disks": disks,
             "georing:missing_disks": missing,
-            "georing:attribution": [by_position(p).attribution(slot.year) for p in disks],
+            # Each line once: both Meteosats ask for the same one.
+            "georing:attribution": list(dict.fromkeys(by_position(p).attribution(slot.year) for p in disks)),
         },
         "assets": {"image": {"href": f"./{mosaic_id(slot)}.tif", "type": COG, "roles": ["data", "visual"]}},
         "links": [

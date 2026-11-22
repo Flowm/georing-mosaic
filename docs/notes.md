@@ -131,7 +131,7 @@ attempted.
   service. "Hourly Data" are "those nominal full disk repeat cycles of data
   referenced by EUMETSAT in time to each clock hour (UTC)".
 
-**Where the four satellites leave gaps**
+**Where the four satellites leave gaps** (before Meteosat-9)
 
 With the 85° limb limit, on a grid of 0.25° between 85°S and 85°N:
 - 4.3% of the Earth's area is seen by none of the four, 4.0% of it poleward
@@ -239,7 +239,7 @@ pyspectral 0.14.3 and pyorbital 1.14.0.
 - EUMETView's `mtg_fd:rgb_geocolour` is this composite: it differs from our
   render of `geo_color` by 1.5 levels of 255 on average. It is therefore no
   independent reference. NASA GIBS carries CIRA's GeoColor for GOES regridded
-  to lat/lon; SLIDER carries it for all four satellites, unregridded.
+  to lat/lon; SLIDER carries it for all five satellites, unregridded.
 - There are two official GeoColors. NOAA STAR's GOES-19 full disk
   (`cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/`, JPEG at 10848 px on
   SLIDER's grid kept about ten days, GeoTIFF about three) and GIBS's
@@ -258,7 +258,8 @@ pyspectral 0.14.3 and pyorbital 1.14.0.
   layer is finished after the last resample (ADR 0006). The warped lights are
   kept under `<work_dir>/grids/`; the land mask takes about 3 s and is warped
   for every render. The night layer's clouds are therefore 2 km data for GOES
-  and Himawari and 1 km for Meteosat, as the infrared bands are.
+  and Himawari, 1 km for MTG-I1 and 3 km for Meteosat-9, as the infrared
+  bands are.
 - satpy's background compositor fills the clouds everywhere, so where a
   satellite scanned no infrared the night layer was the city lights alone,
   opaque. Meteosat-9's scans miss rows at both ends of its grid: on
@@ -277,10 +278,12 @@ pyspectral 0.14.3 and pyorbital 1.14.0.
 
 **Recipe**
 
-The Comparison scenes come in two sets. The **tuning set** (2026-11-10) is
-what curves are read off and what changes are looked at. The **holdout set**
-(2026-09-14, the oldest day SLIDER still held for all four satellites on
-2026-11-11, at places no tuning scene covers) is only measured: no parameter
+The Comparison scenes come in two sets. The **tuning set** (2026-11-10, and
+four scenes from 15 to 19 November for a low sun and the limbs) is what
+curves are read off and what changes are looked at. The **holdout set**
+(2026-09-14, the oldest day SLIDER still held for the four satellites of
+then on 2026-11-11, and 2026-11-14 and 2026-10-01; at places no tuning scene
+covers) is only measured: no parameter
 is fitted to it or adjusted against it by eye. `georing-compare --set
 holdout` runs it alone. The figures are the mean absolute difference from
 CIRA's GeoColor per channel (red, green, blue), in levels of 255, for
@@ -319,6 +322,8 @@ now.
 | glint-seviri | tuning | Meteosat-9, 03:00 (2026-11-19) | the sun's reflection south of India | – | – | 33, 28, 25 |
 | limb-south-dawn | tuning | Meteosat, 03:00 (2026-11-19) | sea ice and cloud on MTG-I1's southern limb at dawn | – | – | 15, 15, 15 |
 | lowsun | tuning | GOES-West, 19:00 (2026-11-15) | the North Pacific under a low midday sun | – | – | 7, 9, 10 |
+| limb-dawn | tuning | Meteosat, 02:00 (2026-11-16) | the Indian Ocean on MTG-I1's eastern limb at dawn | – | – | 21, 21, 20 |
+| h-limb-dusk | holdout | Meteosat, 21:00 (2026-11-14) | MTG-I1's western limb at dusk over Brazil and the South Atlantic | – | – | 10, 10, 10 |
 | h-lowsun | holdout | Meteosat, 13:00 (2026-11-14) | the North Atlantic under a low midday sun | – | – | 8, 12, 17 |
 
 The five scenes whose reference was lost were dropped from `georing-compare`
@@ -481,8 +486,9 @@ What the Recipe changes from `geo_color`:
   about 11 levels too bright. Of the scenes measured, only night reaches
   poleward of 30°, and its coldest top there is 233 K; the 198 K poleward is
   the old 205 K moved by the same 7 K, not measured.
-- **The low-cloud layer starts at 0 K over land on every sensor**
-  (`georing_low_clouds`). `geo_color` starts it at 1.5 K for FCI. Dry ground
+- **The low-cloud layer starts at 0 K over land on every sensor but SEVIRI**
+  (`georing_low_clouds`), whose starts at 2.6 K over land and 3.3 K over sea
+  (`seviri.yaml` says why). `geo_color` starts it at 1.5 K for FCI. Dry ground
   emits less at 3.9 µm, so CIRA tints it bluish-lilac by night; the Recipe now
   does too, which fixed both warm-ground night scenes.
 - **City lights from radiance at 500 m** (ADR 0006, `georing.lights`):
@@ -822,7 +828,7 @@ the high-cloud layer can ignore.
   clouds', the lights cost 2.3 GB more on GOES-East (14.5) and 0.7 more on
   Meteosat (21.7), the same picture again. Warping the lights onto a grid takes 20 to 30 s,
   once per satellite.
-- Settings: dask `array.chunk-size` of `32MiB`, `DASK_NUM_WORKERS` 4 to 8,
+- Settings: dask `array.chunk-size` of `32MiB`, `DASK_NUM_WORKERS` as many as the step's cores,
   `OMP_NUM_THREADS=1`, and a raised `GDAL_CACHEMAX`.
 - Maintainers report about 6 GB and under 140 s for a full-disk ABI
   `true_color`, and 260 to 290 s for AHI with four workers
@@ -845,22 +851,56 @@ the high-cloud layer can ignore.
   process skips interpreter teardown to keep the log clean.
 
 **What a render prints**
-- satpy and its libraries print the same six lines on every render. Each was
-  traced to its cause on a night-time GOES-East Disk on 2026-11-13, and none
-  changes the image, so the render filters exactly these (`KNOWN_WARNINGS` and
+- satpy and its libraries print the same few lines on every render. Each was
+  traced to its cause, the first six on a night-time GOES-East Disk on
+  2026-11-13 and the rest on 2026-11-22 (below), and none changes the image,
+  so the render filters exactly these (`KNOWN_WARNINGS` and
   `KNOWN_LOG_LINES` in `georing.render`) and shows whatever else is said.
+  The dask ones are filtered by message wherever dask raises them, so a
+  division of our own that goes wrong would be hidden too.
 - "The following datasets were not created and may require resampling": satpy,
   twice, because the render loads the Recipe in two stages.
 - "No sensor name specified in HDF5 file": pyspectral, reading a sensor's
-  response file for the Rayleigh correction.
+  response file for the Rayleigh correction. "No 'platform_name' in HDF5
+  file" likewise, for Meteosat-9's (`rsr_seviri_Meteosat-9.h5`), which keeps
+  the older `platform` and `sat_number`; pyspectral reads the name from
+  those.
 - "divide by zero" and "invalid value" in `trollimage/xrimage.py`: satpy's own
   low-cloud enhancement colours with a one-colour palette, and trollimage
   works out a scale for its metadata from it.
 - "The specified chunks separate the stored chunks": xarray, when satpy opens
-  the two static images. They are read once; the warped copies are kept.
+  the two static images. The warped city lights are kept; the land mask is
+  warped again on every render.
 - "cannot convert float NaN to integer": satpy's image reader, on a static
   image that declares no nodata value. It leaves the data unmasked, which is
   what the Recipe wants.
+- "divide by zero encountered in divide" (dask): satpy's SEVIRI reader turns
+  a radiance into a brightness temperature through `1 / radiance`. On
+  Meteosat-9's 10:00 Disk of 2026-11-22, 1,911 pixels of its 3.9 µm band
+  had a radiance of 0, all seen 76.5° to 91° from vertical (median 88.8°),
+  far outside the strip the Mosaic takes from it.
+- "invalid value encountered in divide" (dask): satpy's background
+  compositor divides by the joined opacity, 0 where both layers are
+  transparent, and fills those pixels on the next line. Seen on Meteosat-9.
+- "invalid value encountered in divide" and "Mean of empty slice" (satpy,
+  `composites/resolution.py`): the ratio sharpening divides the fine band by
+  the coarse one and replaces what is not finite by 1, and averages 2×2
+  blocks with `nanmean`, which off the Disk are all NaN and stay NaN. Read
+  off satpy's code; the stack prints them during the Himawari and MTG-I1
+  renders.
+- Until 2026-11-22 every render of a day layer without an orbit (AHI's)
+  printed "Actual satellite lon/lat not available", "Actual satellite
+  altitude not available" (satpy) and "You will likely lose important
+  projection information" (pyproj): the Recipe gave satpy the grid's
+  satellite as the projection centre, read off a PROJ string. It now reads
+  it off the grid's parameters and gives it as the nominal position, which
+  satpy takes without a warning; the view angles are the same.
+- Not filtered: dask's "All-NaN slice encountered" from `nanmax`, printed now
+  and then during the Meteosat-9 render. It did not recur on the Disks
+  traced, so its cause is not known.
+- The trace has to run as a step does: a render in a process that imported
+  dask before `DASK_ARRAY__CHUNK_SIZE` was set ran with 128 MiB chunks and
+  printed neither divide warning.
 - "invalid value encountered in log": the 3.9 µm brightness temperature is NaN
   where the radiance is negative. That was 477 of 23 million pixels, all on
   cold cloud tops (median 200 K at 10.4 µm), and the night layer shows them as
@@ -1076,7 +1116,8 @@ build, with satpy's `geo_color`, a Seam of 0.5° and four published Renderings:
 a render's time includes writing its Rendering, 21 to 39 s, and its output is
 that Rendering.
 
-What holds now, with the Recipe, the 5° Seam and only the Mosaic published:
+What holds now, with the Recipe, the 5° Seam and only the Mosaic published,
+measured with the four Disks of then unless Meteosat-9 is named:
 
 - A Slot takes about 17 minutes on 8 cores. The 23:00 Slot of 2026-11-11,
   built from a shell on 2026-11-13, took 16 min 45 s: the four renders 145 to

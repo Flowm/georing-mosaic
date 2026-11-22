@@ -57,8 +57,10 @@ not a reference. Never the name of anything produced here.
 
 **Comparison scene**:
 A fixed place and time at which a Rendering is judged against GeoColor. There
-are twenty-seven in two sets. The seventeen of the **tuning set** (2026-11-10)
-are what the Recipe is fitted to and looked at. The ten of the **holdout set**
-(2026-09-14, and 2026-10-01 for Meteosat-9; other places) are only measured,
-never tuned against: they tell whether a change holds where it was not made.
+are twenty-eight in two sets. The twenty-one of the **tuning set**
+(2026-11-10, and four from 15 to 19 November for a low sun and the limbs) are
+what the Recipe is fitted to and looked at. The seven of the **holdout set**
+(2026-09-14 and 2026-11-14, and 2026-10-01 for Meteosat-9; other places) are
+only measured, never tuned against: they tell whether a change holds where it
+was not made.
 _Avoid_: Test image, sample

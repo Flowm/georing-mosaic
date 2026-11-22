@@ -159,6 +159,23 @@ def test_the_twilight_compositor_stretches_and_blends_by_sun_zenith(monkeypatch)
     assert not hasattr(comp, "_sunz") and not hasattr(comp, "_glare")
 
 
+def test_a_day_layer_without_an_orbit_takes_the_grids_satellite_without_a_warning():
+    import warnings
+
+    from pyresample.geometry import AreaDefinition
+    from satpy.utils import get_satpos
+
+    from georing.recipe import _with_orbit
+
+    geos = "+proj=geos +lon_0=140.7 +h=35785863 +a=6378137 +rf=298.257024882273 +units=m +sweep=y"
+    area = AreaDefinition("disk", "", "", geos, 2, 2, (-5e6, -5e6, 5e6, 5e6))
+    day = xr.DataArray(np.zeros((2, 2)), dims=("y", "x"), attrs={"area": area})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert get_satpos(_with_orbit(day)) == (140.7, 0.0, 35785863.0)
+    assert "orbital_parameters" not in day.attrs
+
+
 def test_a_colour_the_table_cannot_vouch_for_fades_to_grey():
     from georing.recipe import distrust, toward_grey
 

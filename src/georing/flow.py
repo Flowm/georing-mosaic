@@ -21,7 +21,6 @@ from prefect.deployments import run_deployment
 from prefect.futures import as_completed
 
 from georing.catalogue import Catalogue, mosaic_id, stamp, to_slot
-from georing.download import DiskMissing
 from georing.lights.cog import LOGIN, NoLogin, lights_path
 from georing.satellites import InDataStore, by_position
 from georing.settings import Settings, load_dotenv, settings
@@ -98,10 +97,12 @@ def _step(cfg: Settings, step: str, target: str, env: dict[str, str], timeout: t
 
 
 @task
-def download(position: str, slot: datetime, scratch: str, deadline: datetime) -> None:
+def download(position: str, slot: datetime, scratch: str, deadline: datetime) -> str | None:
     """Download one Disk, asking its source once a minute until ``deadline``.
 
-    Fails if the source does not hold all of the Disk by then.
+    Returns what is missing if the source does not hold all of the Disk by
+    then. That is to be expected, so the task does not fail for it: Prefect
+    would log each such failure as an error, with a traceback.
     """
     cfg = settings()
     log = get_run_logger()
@@ -117,10 +118,8 @@ def download(position: str, slot: datetime, scratch: str, deadline: datetime) ->
             )
         except StepFailed as failure:
             lacking = str(failure)
-        if lacking is None:
-            return
-        if datetime.now(UTC) + POLL > deadline:
-            raise DiskMissing(lacking)
+        if lacking is None or datetime.now(UTC) + POLL > deadline:
+            return lacking
         if lacking != said:
             # Not every minute: Meteosat's answer stays the same for many.
             log.info("%s; asking every minute until %s", lacking, f"{deadline:%H:%M}")
@@ -335,7 +334,8 @@ def _build(
     arrived: list[str] = []
     lacking = [p for p in cfg.satellite_set if p not in previous] if previous and not force else []
     for finished, position in fetch(lacking).items():
-        if isinstance(outcome := finished.result(raise_on_failure=False), BaseException):
+        # What is missing, or what the task failed with.
+        if (outcome := finished.result(raise_on_failure=False)) is not None:
             log.warning("No Disk for %s: %s", position, outcome)
         else:
             arrived.append(position)
@@ -368,7 +368,7 @@ def _build(
         outcome = finished.result(raise_on_failure=False)
         if finished in downloads:
             position = downloads.pop(finished)
-            if isinstance(outcome, BaseException):
+            if outcome is not None:
                 log.warning("No Disk for %s by the deadline: %s", position, outcome)
                 continue
             arrived.append(position)

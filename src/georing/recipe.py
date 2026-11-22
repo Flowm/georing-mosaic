@@ -193,14 +193,18 @@ def _with_orbit(day):
 
     Some day layers lose it in their own compositing (AHI's), and the night
     layer never has it; it is then taken from the grid, which places the
-    satellite on the equator at its nominal longitude.
+    satellite on the equator at its nominal longitude. satpy takes that as
+    the nominal position, and does not warn as it would for the grid's.
     """
     if day.attrs.get("orbital_parameters"):
         return day
-    proj = day.attrs["area"].crs.to_dict()
+    # Read off the grid's parameters: a PROJ string of it would warn of what it loses.
+    grid = {p.name: p.value for p in day.attrs["area"].crs.coordinate_operation.params}
     day = day.copy()
     day.attrs["orbital_parameters"] = {
-        "projection_longitude": proj["lon_0"], "projection_latitude": 0.0, "projection_altitude": proj["h"],
+        "satellite_nominal_longitude": grid["Longitude of natural origin"],
+        "satellite_nominal_latitude": 0.0,
+        "satellite_nominal_altitude": grid["Satellite Height"],
     }
     return day
 

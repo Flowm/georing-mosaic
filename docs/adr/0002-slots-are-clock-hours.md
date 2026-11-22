@@ -9,7 +9,8 @@ full clock hour and uses the scan that starts on that hour. The reason is
 EUMETSAT's data policy (as amended 25 November 2025): the hourly Meteosat scans
 are CC-BY and may be shown publicly in real time, while the other scans may not
 be shown publicly until they are an hour old without a paid licence. Hourly is
-the only cadence at which all four satellites are both free and current.
+the only cadence at which all four satellites are both free and current
+(and the fifth, Meteosat-9, added since: ADR 0005).
 
 ## Consequences
 

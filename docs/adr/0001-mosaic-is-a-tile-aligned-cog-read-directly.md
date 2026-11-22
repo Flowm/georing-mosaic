@@ -35,5 +35,6 @@ product is one reusable file per Slot and needs no service of its own.
   replaces its file under the same name, so a client sends `If-Match` with the
   header's ETag on each tile request and reads the header again on a 412.
 - Zoom 8 is 1.2 times coarser than the finest band directly under each
-  satellite. That detail is given up: the Renderings, which keep it, are
+  satellite (but Meteosat-9, added since, whose 3 km bands it holds at five
+  times their detail: ADR 0005). That detail is given up: the Renderings, which keep it, are
   working files and are not published.

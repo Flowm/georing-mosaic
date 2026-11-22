@@ -11,7 +11,6 @@ from prefect.logging import disable_run_logger
 from prefect.testing.utilities import prefect_test_harness
 
 from georing import download, flow
-from georing.download import DiskMissing
 from georing.lights.cog import NoLogin
 from georing.settings import settings
 from georing.step import StepFailed
@@ -339,8 +338,7 @@ def test_a_download_asks_again_each_minute_until_the_deadline(steps, monkeypatch
         assert len(attempts) == 3 and naps == [60.0, 60.0]
 
         attempts.clear()
-        with pytest.raises(DiskMissing, match="exited with 1"):
-            flow.download.fn("himawari", SLOT, "/scratch", datetime.now(UTC))
+        assert flow.download.fn("himawari", SLOT, "/scratch", datetime.now(UTC)) == "download himawari exited with 1"
         assert len(attempts) == 1
 
 
