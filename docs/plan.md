@@ -253,9 +253,13 @@ behaviour of satpy, Prefect and the COG driver, and what a Slot costs, is in
   so a consumer can tell when the data is stale.
 - **Links are relative** and Items sit beside their products, so the tree can
   be served from any prefix. The layout is in `src/georing/catalogue.py`.
-- **Each Item carries the attribution** its data providers ask for, each line
-  once: both Meteosats ask for the same one. Until 2026-11-22 it was listed
-  twice when both contributed.
+- **Each Item carries the attribution** its data providers ask for, as two
+  lines at most (`georing.satellites.attribution`): the satellites NOAA
+  distributes grouped by provider, with NOAA's disclaimer once
+  ("GOES-19, GOES-18: NOAA. Himawari-9: JMA, via NOAA. No endorsement by NOAA
+  is implied."), and EUMETSAT's own line once for both Meteosats. Until
+  2026-11-23 each satellite had a line of its own, with the disclaimer on
+  each GOES and the JMA's name in full; Items written before keep theirs.
 - **The catalogue is the record of which Slots are done** (ADR 0003).
 - **The output location is a URL setting,** `output_url`: a path for a host
   directory, the default, or `s3://bucket/prefix` for a bucket (Cloudflare R2

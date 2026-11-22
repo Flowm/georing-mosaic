@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from georing.satellites import by_position
+from georing.satellites import attribution
 from georing.storage import JSON, Bucket, Directory
 
 STAC_VERSION = "1.1.0"
@@ -66,8 +66,7 @@ def mosaic_item(slot: datetime, disks: list[str], missing: list[str]) -> dict:
             "created": _iso(datetime.now(UTC)),
             "georing:disks": disks,
             "georing:missing_disks": missing,
-            # Each line once: both Meteosats ask for the same one.
-            "georing:attribution": list(dict.fromkeys(by_position(p).attribution(slot.year) for p in disks)),
+            "georing:attribution": attribution(disks, slot.year),
         },
         "assets": {"image": {"href": f"./{mosaic_id(slot)}.tif", "type": COG, "roles": ["data", "visual"]}},
         "links": [

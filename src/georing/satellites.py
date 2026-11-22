@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from typing import ClassVar
 
 
 @dataclass(frozen=True)
@@ -16,16 +17,14 @@ class Satellite:
     reader: str
     expected_files: int = 0
 
-    def attribution(self, year: int) -> str:
-        """Return the line the provider of the data asks for, for a Mosaic of ``year``."""
-        raise NotImplementedError
-
 
 @dataclass(frozen=True)
 class InBucket(Satellite):
     """A position whose Disks are in an anonymous S3 bucket in us-east-1."""
 
     bucket: str = ""
+    # Whose data it is, as the credit names them; NOAA distributes it.
+    provider: ClassVar[str] = ""
 
     def prefix(self, slot: datetime) -> str:
         """Return the bucket prefix holding the Disk that starts at ``slot``."""
@@ -44,9 +43,6 @@ class InDataStore(Satellite):
     # The product's files that make the Disk, by their names.
     entries: str = ""
 
-    def attribution(self, year: int) -> str:
-        return f"Contains modified EUMETSAT Meteosat data {year}"
-
 
 @dataclass(frozen=True)
 class Goes(InBucket):
@@ -55,8 +51,7 @@ class Goes(InBucket):
     number: int = 0
     bands: tuple[str, ...] = ("C01", "C02", "C03", "C07", "C13")
 
-    def attribution(self, year: int) -> str:
-        return f"{self.platform} imagery: NOAA. No endorsement by NOAA is implied."
+    provider: ClassVar[str] = "NOAA"
 
     def prefix(self, slot: datetime) -> str:
         return f"ABI-L1b-RadF/{slot:%Y/%j/%H}/"
@@ -76,8 +71,7 @@ class Himawari(InBucket):
     number: int = 9
     bands: tuple[str, ...] = ("B01", "B02", "B03", "B04", "B07", "B13")
 
-    def attribution(self, year: int) -> str:
-        return f"{self.platform} imagery: Japan Meteorological Agency, distributed by NOAA."
+    provider: ClassVar[str] = "JMA, via NOAA"
 
     def prefix(self, slot: datetime) -> str:
         return f"AHI-L1b-FLDK/{slot:%Y/%m/%d/%H%M}/"
@@ -114,6 +108,27 @@ SATELLITE_SET: tuple[Satellite, ...] = (
         expected_files=1,
     ),
 )
+
+
+def attribution(positions: list[str], year: int) -> list[str]:
+    """Return the credit lines the providers of ``positions``' data ask for, for a Mosaic of ``year``.
+
+    The satellites NOAA distributes share one line, grouped by provider and
+    with NOAA's disclaimer once; EUMETSAT's line is the policy's own wording
+    and names no satellite.
+    """
+    used = [sat for sat in SATELLITE_SET if sat.position in positions]
+    by_provider: dict[str, list[str]] = {}
+    for sat in used:
+        if isinstance(sat, InBucket):
+            by_provider.setdefault(sat.provider, []).append(sat.platform)
+    lines = []
+    if by_provider:
+        named = " ".join(f"{', '.join(platforms)}: {who}." for who, platforms in by_provider.items())
+        lines.append(f"{named} No endorsement by NOAA is implied.")
+    if any(isinstance(sat, InDataStore) for sat in used):
+        lines.append(f"Contains modified EUMETSAT Meteosat data {year}")
+    return lines
 
 
 def by_position(position: str) -> Satellite:

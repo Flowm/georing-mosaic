@@ -123,7 +123,9 @@ attempted.
 
 **Licences and attribution**
 - GOES: open; NOAA asks for attribution and no implied endorsement.
-- Himawari: JMA data distributed by NOAA; both ask for attribution.
+- Himawari: JMA data distributed by NOAA; both ask for attribution. The
+  Item names them "JMA, via NOAA", with NOAA's disclaimer once for all the
+  satellites it distributes.
 - Meteosat: see ADR 0002. Images made from the data are our own; the required
   line is "[Contains modified] EUMETSAT Meteosat data [year]". The policy's
   Article 4 lists "All Level 1 Hourly SEVIRI, FCI and IRS data" as Core data,

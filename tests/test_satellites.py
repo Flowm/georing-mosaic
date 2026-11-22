@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from georing.satellites import by_position
+from georing.satellites import attribution, by_position
 
 SLOT = datetime(2026, 11, 10, 18, tzinfo=UTC)
 
@@ -34,3 +34,13 @@ def test_a_meteosat_disk_is_the_files_its_reader_opens():
     assert not re.search(fci.entries, f"{stem}TRAIL---NC4E_C_EUMT_20261110181013_IDPFI_OPE_20261110180007_20261110180924_N_JLS_C_0108_0000.nc")
     assert re.search(seviri.entries, "MSG2-SEVI-MSG15-0100-NA-20261110061239.803000000Z-NA.nat")
     assert not any(re.search(seviri.entries, name) for name in ("EOPMetadata.xml", "manifest.xml"))
+
+
+def test_the_credit_groups_the_satellites_by_provider_and_says_each_thing_once():
+    every = ["goes-east", "goes-west", "himawari", "meteosat-0", "meteosat-iodc"]
+    assert attribution(every, 2026) == [
+        "GOES-19, GOES-18: NOAA. Himawari-9: JMA, via NOAA. No endorsement by NOAA is implied.",
+        "Contains modified EUMETSAT Meteosat data 2026",
+    ]
+    assert attribution(["meteosat-iodc"], 2027) == ["Contains modified EUMETSAT Meteosat data 2027"]
+    assert attribution(["himawari"], 2026) == ["Himawari-9: JMA, via NOAA. No endorsement by NOAA is implied."]

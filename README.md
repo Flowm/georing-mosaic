@@ -141,8 +141,8 @@ one build at a time. Meteosat-9's colour table is remade with
 
 The imagery is made from data of NOAA (GOES), the Japan Meteorological Agency
 (Himawari, distributed by NOAA) and EUMETSAT (Meteosat). Each STAC Item
-carries the attribution line its provider asks for; show it wherever an image
-is shown. NOAA's attribution implies no endorsement by NOAA. Images that
+carries the attribution its providers ask for, in at most two lines; show it
+wherever an image is shown. NOAA's attribution implies no endorsement by NOAA. Images that
 include Meteosat carry "Contains modified EUMETSAT Meteosat data" with the
 year.
 

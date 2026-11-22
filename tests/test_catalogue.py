@@ -35,8 +35,7 @@ def test_a_slot_is_done_once_its_mosaic_item_exists(tmp_path):
 def test_the_item_says_whose_data_the_mosaic_is_made_of():
     item = mosaic_item(SLOT, ["goes-west", "himawari", "meteosat-0", "meteosat-iodc"], ["goes-east"])
     assert item["properties"]["georing:attribution"] == [
-        "GOES-18 imagery: NOAA. No endorsement by NOAA is implied.",
-        "Himawari-9 imagery: Japan Meteorological Agency, distributed by NOAA.",
+        "GOES-18: NOAA. Himawari-9: JMA, via NOAA. No endorsement by NOAA is implied.",
         "Contains modified EUMETSAT Meteosat data 2026",
     ]
     assert item["assets"]["image"]["href"] == "./georing_mosaic_20261110T1800Z.tif"
