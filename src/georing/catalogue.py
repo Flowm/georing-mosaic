@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from georing.satellites import Satellite, by_position
+from georing.satellites import by_position
 from georing.storage import Bucket, Directory
 
 STAC_VERSION = "1.1.0"
@@ -49,15 +49,6 @@ def day_path(slot: datetime) -> str:
     return f"mosaic/{slot:%Y/%m/%d}"
 
 
-def attribution(sat: Satellite, year: int) -> str:
-    """Return the line the provider of ``sat``'s data asks for."""
-    if sat.reader == "abi_l1b":
-        return f"{sat.platform} imagery: NOAA. No endorsement by NOAA is implied."
-    if sat.reader == "ahi_hsd":
-        return f"{sat.platform} imagery: Japan Meteorological Agency, distributed by NOAA."
-    return f"Contains modified EUMETSAT Meteosat data {year}"
-
-
 def mosaic_item(slot: datetime, disks: list[str], missing: list[str]) -> dict:
     """Return the Item of a Mosaic: which Disks it was built from, and whose data they are."""
     west, south, east, north = WORLD
@@ -76,7 +67,7 @@ def mosaic_item(slot: datetime, disks: list[str], missing: list[str]) -> dict:
             "created": _iso(datetime.now(UTC)),
             "georing:disks": disks,
             "georing:missing_disks": missing,
-            "georing:attribution": [attribution(by_position(p), slot.year) for p in disks],
+            "georing:attribution": [by_position(p).attribution(slot.year) for p in disks],
         },
         "assets": {"image": {"href": f"./{mosaic_id(slot)}.tif", "type": COG, "roles": ["data", "visual"]}},
         "links": [

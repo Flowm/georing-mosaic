@@ -23,7 +23,7 @@ from prefect.futures import as_completed
 from georing.catalogue import Catalogue, mosaic_id, mosaic_item, stamp, to_slot
 from georing.download import DiskMissing
 from georing.lights.cog import LOGIN, NoLogin, lights_path
-from georing.satellites import by_position
+from georing.satellites import InDataStore, by_position
 from georing.settings import Settings, load_dotenv, settings
 from georing.step import SCRATCH_NEEDED_GB, StepFailed, run_step, runtime_env
 
@@ -90,7 +90,7 @@ def _secrets() -> dict[str, str]:
 def _askable(cfg: Settings) -> list[str]:
     """Return the positions whose source can be asked: without its key the Data Store cannot."""
     secrets = _secrets()
-    return [p for p in cfg.satellite_set if by_position(p).bucket or secrets]
+    return [p for p in cfg.satellite_set if secrets or not isinstance(by_position(p), InDataStore)]
 
 
 def _step(cfg: Settings, step: str, target: str, env: dict[str, str], timeout: timedelta = STEP_TIMEOUT, **kwargs):
@@ -106,7 +106,7 @@ def download(position: str, slot: datetime, scratch: str, deadline: datetime) ->
     cfg = settings()
     log = get_run_logger()
     # Only the EUMETSAT Data Store wants a key.
-    secrets = {} if by_position(position).bucket else _secrets()
+    secrets = _secrets() if isinstance(by_position(position), InDataStore) else {}
     said = None
     while True:
         try:

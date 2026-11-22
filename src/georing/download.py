@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from georing.satellites import Satellite, by_position
+from georing.satellites import InBucket, InDataStore, by_position
 
 
 class DiskMissing(RuntimeError):
@@ -27,7 +27,7 @@ def download_disk(position: str, slot: str, dest: str) -> None:
     when = datetime.fromisoformat(slot)
     out = Path(dest)
     out.mkdir(parents=True, exist_ok=True)
-    files = _from_bucket(sat, when, out) if sat.bucket else _from_eumetsat(sat, when, out)
+    files = _from_bucket(sat, when, out) if isinstance(sat, InBucket) else _from_eumetsat(sat, when, out)
     if files != sat.expected_files:
         raise DiskMissing(f"{position}: {files} of {sat.expected_files} files for {slot}")
 
@@ -48,7 +48,7 @@ def poll_disk(position: str, slot: str, dest: str) -> str | None:
 def disk_available(position: str, slot: datetime) -> bool:
     """Return whether the source holds the whole Disk of ``position`` for ``slot``."""
     sat = by_position(position)
-    if sat.bucket:
+    if isinstance(sat, InBucket):
         return len(_bucket_objects(_s3(), sat, slot)) == sat.expected_files
     try:
         return len(_eumetsat_entries(sat, slot)) == sat.expected_files
@@ -87,7 +87,7 @@ def _s3():
     )
 
 
-def _bucket_objects(s3, sat: Satellite, slot: datetime) -> list[dict]:
+def _bucket_objects(s3, sat: InBucket, slot: datetime) -> list[dict]:
     pattern = sat.key_pattern(slot)
     objects = []
     for page in s3.get_paginator("list_objects_v2").paginate(
@@ -97,7 +97,7 @@ def _bucket_objects(s3, sat: Satellite, slot: datetime) -> list[dict]:
     return objects
 
 
-def _from_bucket(sat: Satellite, slot: datetime, out: Path) -> int:
+def _from_bucket(sat: InBucket, slot: datetime, out: Path) -> int:
     """Fetch the Disk's files that the bucket holds; return how many there are."""
     s3 = _s3()
     objects = _bucket_objects(s3, sat, slot)
@@ -114,7 +114,7 @@ def _from_bucket(sat: Satellite, slot: datetime, out: Path) -> int:
     return len(objects)
 
 
-def _eumetsat_entries(sat: Satellite, slot: datetime) -> list[tuple]:
+def _eumetsat_entries(sat: InDataStore, slot: datetime) -> list[tuple]:
     """Return ``(product, entry)`` for every file of the Disk in the Data Store."""
     import eumdac
 
@@ -140,7 +140,7 @@ def _eumetsat_entries(sat: Satellite, slot: datetime) -> list[tuple]:
     return jobs
 
 
-def _from_eumetsat(sat: Satellite, slot: datetime, out: Path) -> int:
+def _from_eumetsat(sat: InDataStore, slot: datetime, out: Path) -> int:
     """Fetch the Disk's files that the Data Store holds; return how many there are."""
     jobs = _eumetsat_entries(sat, slot)
 
