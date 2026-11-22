@@ -123,9 +123,10 @@ def blend(layers: list[tuple[np.ndarray, np.ndarray, np.ndarray]], width: float 
     ``GLINT_FEATHER`` degrees further per degree of the difference, and each
     view's weight drops toward ``GLINT_WEIGHT`` with its penalty. Each one's
     share also fades out over the last ``LIMB_FADE_DEG`` of its view
-    angle before ``MAX_VIEW_ZENITH_DEG``. A satellite with no data at a pixel
-    takes no part there, so its neighbours fill the gap; one alone at a
-    pixel keeps its colour however small its share.
+    angle before ``MAX_VIEW_ZENITH_DEG``; beyond it a layer is transparent,
+    as `join_renderings` reads it. A satellite with no data at a pixel takes
+    no part there, so its neighbours fill the gap; one alone at a pixel keeps
+    its colour however small its share.
     """
     best = np.full(layers[0][0].shape, np.inf, dtype=np.float32)
     best_penalty = np.zeros(best.shape, dtype=np.float32)
@@ -142,7 +143,7 @@ def blend(layers: list[tuple[np.ndarray, np.ndarray, np.ndarray]], width: float 
         w = np.clip((best + reach - rank) / reach, 0.0, 1.0)
         w = w * w * (3.0 - 2.0 * w) * np.clip((MAX_VIEW_ZENITH_DEG - angle) / LIMB_FADE_DEG, 1e-3, 1.0)
         w *= 1.0 - (1.0 - GLINT_WEIGHT) * penalty / GLINT_PENALTY_DEG
-        w[(rgba[3] == 0) | (angle > MAX_VIEW_ZENITH_DEG)] = 0.0
+        w[rgba[3] == 0] = 0.0
         wa = w * rgba[3]
         colour += wa * rgba[:3]
         opacity += wa
@@ -261,7 +262,7 @@ def join_renderings(
             if (rank >= best + reach).all():
                 continue  # outside every Seam with a lower rank
             rgba = warped()[position].read(window=window)
-            rgba[3][zenith > MAX_VIEW_ZENITH_DEG] = 0
+            rgba[3][zenith > MAX_VIEW_ZENITH_DEG] = 0  # smeared along the limb (blend)
             if rgba[3].any():
                 layers.append((zenith, rgba, rank))
                 np.minimum(best, np.where(rgba[3] > 0, rank, np.inf), out=best)

@@ -65,7 +65,9 @@ def test_a_satellite_crossing_its_limit_leaves_no_step_in_colour():
     # One satellite's view goes past the limit while its neighbour, just
     # steeper, stays: its share must fade out, not stop at the limit.
     going = np.arange(83.0, 86.0, 0.05, dtype=np.float32)[None, :]
-    out = blend([layer(200, going), layer(100, np.full_like(going, 83.5))])[0, 0].astype(int)
+    past = layer(200, going)
+    past[1][3][going > 85.0] = 0  # beyond the limit a Rendering is read as transparent
+    out = blend([past, layer(100, np.full_like(going, 83.5))])[0, 0].astype(int)
     assert out[0] > 140 and out[-1] == 100
     assert np.abs(np.diff(out)).max() <= 5
 
