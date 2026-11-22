@@ -237,24 +237,42 @@ class TwilightCompositor(DayNightCompositor):
         super().__init__(name, **kwargs)
 
     def __call__(self, datasets, optional_datasets=None, **attrs):
+        import copy
+
         from satpy.modifiers.angles import get_angles
 
+        datasets = self.match_data_arrays(datasets)
+        sat_azimuth, satz, sun_azimuth, sunz = get_angles(_with_orbit(datasets[0]))
         # The land mask is an optional prerequisite only because satpy's
         # day/night compositor takes a third prerequisite for the sun zenith.
-        datasets = self.match_data_arrays(datasets)
-        land = self.match_data_arrays([datasets[0], *optional_datasets])[1]
-        land = land.squeeze("bands", drop=True) if "bands" in land.dims else land
-        sat_azimuth, satz, sun_azimuth, sunz = get_angles(_with_orbit(datasets[0]))
-        self._sunz = sunz
-        glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
-        self._glare = glare(sunz.data, glint, self.glare_sun, self.glare_angle) * (1 - land.data / 100).clip(0, 1)
-        result = super().__call__(datasets, **attrs)
+        # Without it there is no telling sea from land, and no glare is taken.
+        sea_glare = 0.0
+        if optional_datasets:
+            land = self.match_data_arrays([datasets[0], *optional_datasets])[1]
+            land = land.squeeze("bands", drop=True) if "bands" in land.dims else land
+            glint = glint_angle(sunz.data, satz.data, sun_azimuth.data, sat_azimuth.data)
+            sea_glare = glare(sunz.data, glint, self.glare_sun, self.glare_angle) * (1 - land.data / 100).clip(0, 1)
+        # satpy hands its weights and layers from one method to the next, and
+        # the sun zenith and glare go with them on a copy made for this call:
+        # the compositor itself, which satpy keeps, holds nothing of a render.
+        call = copy.copy(self)
+        call._sunz, call._glare = sunz, sea_glare
+        result = DayNightCompositor.__call__(call, datasets, **attrs)
         # Where the satellite was: the night layer's static images have no
         # orbit, so satpy's merged metadata drops it. The Mosaic needs it
         # (georing.render.satellite_position_tags).
         if orbit := datasets[0].attrs.get("orbital_parameters"):
             result.attrs["orbital_parameters"] = orbit
         return result
+
+    # satpy's own weights, from the sun zenith this call already has: satpy
+    # would work it out again over the whole Disk. As when satpy works it out
+    # itself, the weights are then masked where neither layer has data.
+    def _get_coszen_blending_weights(self, projectables):
+        lim_low, lim_high = float(np.cos(np.radians(self.lim_low))), float(np.cos(np.radians(self.lim_high)))
+        self._has_sza = False
+        coszen = np.cos(np.radians(self._sunz))
+        return ((coszen - min(lim_high, lim_low)) / abs(lim_low - lim_high)).clip(0, 1)
 
     # satpy's own merge, but the bands go through `twilight`.
     def _merge_bands_with_weights(self, day_data, night_data, weights, attrs):

@@ -132,7 +132,8 @@ def test_the_twilight_compositor_stretches_and_blends_by_sun_zenith(monkeypatch)
     # The last two pixels look straight into the sun's reflection.
     sun_azimuth, sat_azimuth = grid([0.0, 0.0, 0.0, 90.0, 90.0]), grid([0.0, 0.0, 0.0, 270.0, 270.0])
     monkeypatch.setattr(angles, "get_angles", lambda data: (sat_azimuth, grid([70.0] * 5), sun_azimuth, sunz))
-    monkeypatch.setattr(angles, "get_cos_sza", lambda data: np.cos(np.radians(sunz)))
+    # The weights come from the sun zenith above, not one worked out again.
+    monkeypatch.setattr(angles, "get_cos_sza", lambda data: pytest.fail("sun zenith worked out twice"))
     orbit = {"satellite_actual_latitude": -6.5, "satellite_actual_longitude": 46.1, "satellite_actual_altitude": 3.6e7}
     comp = TwilightCompositor("georing", lim_low=82, lim_high=86, gain=(1.0, 1.0, 1.2), offset=(0, 0, 51),
                               stretch_start=76, stretch_end=78, glare_sun=(60, 65), glare_angle=(20, 40),
@@ -151,6 +152,11 @@ def test_the_twilight_compositor_stretches_and_blends_by_sun_zenith(monkeypatch)
     np.testing.assert_allclose(out[:, 4], [0.5, 0.5, 0.5])  # the same glare, not burnt out: day stays
     land = comp([day, layer([[0.1] * 3] * 5)], optional_datasets=[grid([100.0] * 5)])
     np.testing.assert_allclose(land.values[:, 0, 3], [1.0, 1.0, 1.0])  # land keeps the day layer
+    # Without the land mask there is no telling sea, and the burnt-out sea keeps the day layer too.
+    unmasked = comp([day, layer([[0.1] * 3] * 5)])
+    np.testing.assert_allclose(unmasked.values[:, 0, 3], [1.0, 1.0, 1.0])
+    # The compositor, which satpy keeps, holds nothing of a render.
+    assert not hasattr(comp, "_sunz") and not hasattr(comp, "_glare")
 
 
 def test_a_colour_the_table_cannot_vouch_for_fades_to_grey():
