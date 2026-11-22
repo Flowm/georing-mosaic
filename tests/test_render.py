@@ -40,11 +40,15 @@ def test_only_the_known_lines_of_the_libraries_are_kept_quiet(caplog):
             ("divide by zero encountered in scalar divide", "trollimage.xrimage"),
             ("invalid value encountered in log", "dask._task_spec"),
             ("invalid value encountered in log10", "dask._task_spec"),
+            ("divide by zero encountered in divide", "dask._task_spec"),
+            ("Mean of empty slice", "satpy.composites.resolution"),
+            ("All-NaN slice encountered", "dask.array.reductions"),
             ("divide by zero encountered in scalar divide", "georing.recipe"),
         ]:
             warnings.warn_explicit(message, RuntimeWarning, "file.py", 1, module=module)
     assert [(str(w.message), w.category) for w in shown] == [
         ("invalid value encountered in log10", RuntimeWarning),
+        ("All-NaN slice encountered", RuntimeWarning),
         ("divide by zero encountered in scalar divide", RuntimeWarning),
     ]
 
@@ -52,6 +56,7 @@ def test_only_the_known_lines_of_the_libraries_are_kept_quiet(caplog):
         logging.getLogger("satpy.scene").warning("The following datasets were not created and may require resampling")
         logging.getLogger("satpy.scene").warning("Something else went wrong")
         logging.getLogger("pyspectral.rsr_reader").warning("No sensor name specified in HDF5 file")
+        logging.getLogger("pyspectral.rsr_reader").warning("No 'platform_name' in HDF5 file")
     assert caplog.messages == ["Something else went wrong"]
 
 
@@ -66,6 +71,24 @@ def test_the_lights_are_read_in_the_chunks_the_cloud_layers_will_have():
     assert render._upsampled_chunks(coarse, fine) == ((16, 8), (12, 12))
     odd = xr.DataArray(da.zeros((25, 24), chunks=8), dims=("y", "x"), attrs={"area": Area(500, (25, 24))})
     assert render._upsampled_chunks(coarse, odd) == odd.chunks
+
+
+def test_the_sun_is_worked_out_on_the_coarse_grid_and_stands_for_the_fine_pixels_under_it():
+    from datetime import datetime
+
+    from satpy.modifiers.angles import get_cos_sza
+
+    fine_area = AreaDefinition("f", "", "", DISK.crs, 40, 40, DISK.area_extent)
+    when = datetime(2026, 11, 22, 12)
+    coarse = xr.DataArray(da.zeros((20, 20), chunks=10, dtype=np.float32), dims=("y", "x"),
+                          attrs={"area": DISK, "start_time": when})
+    fine = xr.DataArray(da.zeros((40, 40), chunks=20, dtype=np.float32), dims=("y", "x"),
+                        attrs={"area": fine_area, "start_time": when})
+    sunz = render.sun_zenith(coarse, fine, ((20, 20), (20, 20)))
+    assert sunz.chunks == ((20, 20), (20, 20)) and sunz.dtype == np.float32
+    on_coarse = np.degrees(np.arccos(get_cos_sza(coarse).values))
+    np.testing.assert_allclose(sunz.compute()[::2, ::2], on_coarse, rtol=1e-5)
+    np.testing.assert_array_equal(sunz.compute()[1::2, 1::2], sunz.compute()[::2, ::2])
 
 
 def test_a_rendering_carries_where_the_satellite_actually_was():

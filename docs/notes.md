@@ -514,6 +514,28 @@ What the Recipe changes from `geo_color`:
   drew the Congo forest near black, where CIRA and now ours show one purple;
   around Lake Victoria CIRA's unlit land is a little lighter than that
   purple.
+- **City lights come on as the sun sets** (2026-11-22). They came in with the
+  night layer, 82–86°, and were at full strength from 86°, the sun still 4°
+  above the horizon, across a strip some 450 km wide: in the Mosaics of
+  2026-11-21 17:00 and 23:00 and 2026-11-22 11:00 to 13:00 the median of lit
+  land (over 20 nW/cm²/sr) rose from that of unlit land at 82° to 50–80
+  levels above it at 84–86° and stayed there. CIRA's Meteosat-9 GeoColor
+  does the same (2026-11-22 02:00: off to 85°, full from 86°). The Recipe
+  now dims the lights' radiance by up to three powers of ten, lifted on a
+  smooth step as the sun goes from 80° to 90° (`dusk` and `decades` of
+  `georing_city_lights`): half-way at 85°, full by sunset (90.8° with
+  refraction); the bright cores come on first. The sun zenith is worked out
+  on the infrared grid and stands for the 0.5 km pixels under it. Compared
+  on Meteosat-9's 01–03 and 11–13 UTC Disks of 2026-11-22, with the fade
+  from 78–88°, 80–90°, 80–92°, 82–94°, 84–96°, 86–98° and 88–98°; the
+  owner chose 80–90°. Lit land above unlit, against about 85 at full: at 86°
+  under 78–88° 60–80 at dawn and 25–60 at dusk, close to no fade; under
+  80–90° 15–40 at dawn and full by 90°; under 84–96° about 0 at 86° and 0–25
+  at sunset, a dark band between the day and the lit cities. Against CIRA,
+  which switches hard, only terminator moved, 6.1 to 6.0 in red (84–96° also
+  moved dawn, 8.5 to 8.6 in green), and h-dusk not at all: lit pixels are
+  few. The other scenes are unchanged, the tint fade over water only
+  included (no scene has Meteosat-9's land under a sun of 64–76°).
 
 What still differs from CIRA:
 - **The terminator.** With the twilight compositor, its wider stretch and the

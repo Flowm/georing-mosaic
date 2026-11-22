@@ -134,7 +134,16 @@ composites:
   # The city lights: a year of VIIRS night radiance at 500 m with a land
   # mask, NASA's Black Marble VJ146A4. All of it is in georing.lights, which
   # builds the file once; the step environment names it.
+  # They come on as the sun sets: dimmed by three powers of ten while the sun
+  # is within dusk's first zenith of overhead, and lifted on a smooth step to
+  # full at its second, half-way at 85 degrees and full by sunset (90.8 with
+  # refraction). With the night layer alone they were at full strength from
+  # 86 degrees, the sun still 4 degrees up, across a strip some 450 km wide,
+  # as CIRA's are from 85 to 86. Later steps, 84 to 96 and after, left a dark
+  # band between the day and the lit cities.
   georing_city_lights:
     compositor: !!python/name:georing.lights.layer.CityLights
     standard_name: georing_city_lights
     filename: ${GEORING_CITY_LIGHTS}
+    dusk: [80, 90]
+    decades: 3

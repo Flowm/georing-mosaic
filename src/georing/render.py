@@ -120,7 +120,8 @@ def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIP
     for ds_id in static:
         if lights.is_city_lights(scn[ds_id]):
             chunks = _upsampled_chunks(coarsest, finest)
-            scn[ds_id] = lights.on_grid(scn[ds_id], finest.attrs["area"], chunks, cache, _land_mask())
+            on_grid = lights.on_grid(scn[ds_id], finest.attrs["area"], chunks, cache, _land_mask())
+            scn[ds_id] = lights.after_sunset(on_grid, sun_zenith(coarsest, finest, chunks))
         else:
             scn[ds_id] = static_on_grid(scn[ds_id], coarsest.attrs["area"], coarsest)
     scn.generate_possible_composites(unload=True)
@@ -140,6 +141,26 @@ def _upsampled_chunks(coarse, fine) -> tuple[tuple[int, ...], tuple[int, ...]]:
     if tuple(sum(c) for c in chunks) != fine.attrs["area"].shape:
         return fine.chunks[-2], fine.chunks[-1]
     return chunks
+
+
+def sun_zenith(coarse, fine, chunks):
+    """Return the sun zenith, in degrees, on ``fine``'s grid in ``chunks``, worked out on ``coarse``'s.
+
+    The sun moves a fiftieth of a degree over 2 km, so each of ``coarse``'s
+    pixels stands for the ``fine`` ones under it, and the angles cost a
+    sixteenth of working them out on the 0.5 km grid. A grid that is not a
+    whole multiple of the coarse one gets its own.
+    """
+    import dask.array as da
+    import numpy as np
+    from satpy.modifiers.angles import get_cos_sza
+
+    factor = round(coarse.attrs["area"].pixel_size_x / fine.attrs["area"].pixel_size_x)
+    on = coarse if tuple(s * factor for s in coarse.shape[-2:]) == fine.shape[-2:] else fine
+    sunz = da.degrees(da.arccos(get_cos_sza(on).data)).astype(np.float32)
+    if on is coarse and factor > 1:
+        sunz = da.repeat(da.repeat(sunz, factor, axis=0), factor, axis=1)
+    return sunz.rechunk(chunks)
 
 
 class _Known(logging.Filter):

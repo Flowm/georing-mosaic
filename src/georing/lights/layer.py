@@ -29,8 +29,13 @@ class CityLights(StaticImageCompositor):
     """The Recipe's compositor for the city lights: satpy's static image, naming its file.
 
     The COG is too large to hold in memory whole, so ``on_grid`` warps it
-    from the file, a window at a time.
+    from the file, a window at a time. ``dusk`` and ``decades`` say how the
+    lights come on after sunset (``after_sunset``); they go with the image.
     """
+
+    def __init__(self, name, *, dusk, decades, **kwargs):
+        super().__init__(name, **kwargs)
+        self.attrs.update(dusk=tuple(dusk), decades=decades)
 
     def __call__(self, *args, **kwargs):
         img = super().__call__(*args, **kwargs)
@@ -77,6 +82,26 @@ def on_grid(image, area, chunks, cache_dir: Path, land_mask: str | None = None):
     out = out.drop_vars(["spatial_ref", "x", "y"], errors="ignore").assign_coords(bands=["L", "A"])
     out.attrs = {**image.attrs, "area": area}
     return out
+
+
+def after_sunset(lights, sunz):
+    """Return the lights on a grid as they show with the sun ``sunz`` degrees from overhead.
+
+    ``sunz`` is a dask array in the lights' chunks. The radiance is dimmed by
+    up to ``decades`` powers of ten (the image's ``decades``) while the sun
+    stands higher than ``dusk[1]``, and fully below ``dusk[0]``, on a smooth
+    step between: the bright cores come on first and the outskirts follow,
+    as at dusk, and they go off the other way round at dawn. A light dimmed
+    by three powers of ten is dark: 140 nW/cm²/sr, the brightest, becomes 0.14.
+    """
+    import xarray as xr
+
+    start, end = lights.attrs["dusk"]
+    step = ((sunz - start) / (end - start)).clip(0, 1)
+    step = step * step * (3 - 2 * step)
+    dimming = (10.0 ** (-lights.attrs["decades"] * (1 - step))).astype(lights.dtype)
+    radiance = lights.sel(bands="L") * dimming
+    return xr.concat([radiance, lights.sel(bands="A")], dim="bands").assign_attrs(lights.attrs)
 
 
 def _warp(source: str, path: Path, area, transform, made_from: str, land_mask: str | None = None) -> None:

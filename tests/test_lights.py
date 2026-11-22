@@ -211,3 +211,17 @@ def test_south_of_black_marbles_tiles_the_land_comes_from_the_land_mask(tmp_path
     # Rows of 10 degrees from 90N: the last two lie south of 70S.
     np.testing.assert_allclose(grid[1, :16], 0.0)
     np.testing.assert_allclose(grid[1, 16:], 1.0)
+
+
+def test_the_lights_come_on_after_sunset_the_bright_ones_first():
+    radiance = np.array([[100.0, 100.0, 100.0, 2.0]], dtype=np.float32)
+    lights = xr.DataArray(
+        np.stack([radiance, np.ones_like(radiance)]), dims=("bands", "y", "x"),
+        coords={"bands": ["L", "A"]}, attrs={"dusk": (84, 96), "decades": 3, "area": DISK},
+    )
+    # The sun still up, halfway through dusk, past its end; a dim light halfway.
+    sunz = da.from_array(np.array([[80.0, 90.0, 100.0, 90.0]], dtype=np.float32))
+    out = layer.after_sunset(lights, sunz)
+    np.testing.assert_allclose(out.sel(bands="L").values[0], [0.1, 100 * 10**-1.5, 100.0, 2 * 10**-1.5], rtol=1e-5)
+    np.testing.assert_array_equal(out.sel(bands="A").values, 1)
+    assert out.dtype == np.float32 and out.attrs["dusk"] == (84, 96)
