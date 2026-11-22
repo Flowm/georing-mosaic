@@ -341,7 +341,15 @@ def _build(
     downloads = fetch([p for p in cfg.satellite_set if p not in lacking])
     # Every render reads the city lights. Waiting for them here, the Disks
     # still download meanwhile: a build of the lights must not make one late.
-    city_lights()
+    try:
+        city_lights()
+    except BaseException:
+        # The downloads write into the scratch that is removed as the run
+        # ends; left running, they would fill it again after that, with
+        # nothing to remove it for hours.
+        for downloading in downloads:
+            downloading.wait()
+        raise
 
     renders: dict[str, str] = {}
     # Render each Disk as it arrives: a late one must not hold up the others.

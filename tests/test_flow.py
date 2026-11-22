@@ -103,6 +103,24 @@ def test_without_the_city_lights_or_a_login_no_disk_is_rendered(steps, monkeypat
     assert not [s for s in steps["steps"] if s.startswith("render")]
 
 
+def test_a_run_that_fails_for_the_city_lights_leaves_no_scratch_behind_its_downloads(steps, monkeypatch, tmp_path):
+    monkeypatch.delenv("EARTHDATA_USERNAME")
+    monkeypatch.setattr(flow, "load_dotenv", lambda path: {})
+    original = flow.run_step
+
+    def run_step(step, *args, **kwargs):
+        if step.startswith("download"):
+            time.sleep(0.5)  # still downloading when the lights fail
+            Path(kwargs["dest"]).mkdir(parents=True)
+            (Path(kwargs["dest"]) / "disk.nc").write_bytes(b"disk")
+        return original(step, *args, **kwargs)
+
+    monkeypatch.setattr(flow, "run_step", run_step)
+    with pytest.raises(NoLogin):
+        flow.build_slot(SLOT)
+    assert not (tmp_path / "work/scratch/20261110T1800Z").exists()
+
+
 def test_a_slot_that_is_done_is_not_built_again(steps):
     flow.build_slot(SLOT)
     steps["steps"].clear()
