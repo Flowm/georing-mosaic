@@ -296,15 +296,19 @@ def _queue_rebuilds(slot: datetime) -> None:
     for late, lacking in late_disks(slot).items():
         log.info("Slot %s can now get %s; queueing its rebuild", late, ", ".join(lacking))
         late_slot = datetime.fromisoformat(late)
-        run_deployment(
-            SLOT_DEPLOYMENT, parameters={"slot": late}, timeout=0,
-            # Named now: a run that waits would show a random name until it starts.
-            flow_run_name=f"georing-slot-{stamp(late_slot)}", work_queue_name=CATCH_UP_QUEUE,
-            # Not a child of this run: cancelling it must not cancel the rebuilds.
-            as_subflow=False,
-            # The same rebuild is asked for once in each REBUILD_AGAIN.
-            idempotency_key=f"rebuild-{stamp(late_slot)}-{'+'.join(lacking)}-{stamp(asked)}",
-        )
+        # The same rebuild is asked for once in each REBUILD_AGAIN.
+        _queue(late_slot, f"rebuild-{stamp(late_slot)}-{'+'.join(lacking)}-{stamp(asked)}")
+
+
+def _queue(slot: datetime, key: str, force: bool = False) -> None:
+    """Queue a run of the flow for ``slot`` in the catch-up queue; another call with ``key`` queues none."""
+    run_deployment(
+        SLOT_DEPLOYMENT, parameters={"slot": slot.isoformat(), "force": force}, timeout=0,
+        # Named now: a run that waits would show a random name until it starts.
+        flow_run_name=f"georing-slot-{stamp(slot)}", work_queue_name=CATCH_UP_QUEUE,
+        # Not a child of the run that asks: cancelling that must not cancel this.
+        as_subflow=False, idempotency_key=key,
+    )
 
 
 def _build(
@@ -424,12 +428,8 @@ def backfill(start: datetime, end: datetime | None = None, force: bool = False) 
         item = catalogue.mosaic(slot)
         # A Disk whose source cannot be asked would only be missed again.
         if force or not item or any(p in askable for p in item["properties"]["georing:missing_disks"]):
-            run_deployment(
-                SLOT_DEPLOYMENT, parameters={"slot": slot.isoformat(), "force": force}, timeout=0,
-                flow_run_name=f"georing-slot-{stamp(slot)}", work_queue_name=CATCH_UP_QUEUE,
-                # Asking again later queues again; a retry of this call does not.
-                idempotency_key=f"backfill-{stamp(slot)}-{asked:%Y%m%dT%H%M%S}",
-            )
+            # Asking again later queues again; a retry of this call does not.
+            _queue(slot, f"backfill-{stamp(slot)}-{asked:%Y%m%dT%H%M%S}", force)
             queued.append(stamp(slot))
         slot -= timedelta(hours=1)
     return queued
