@@ -145,7 +145,7 @@ def city_lights() -> str:
     get_run_logger().info("Building the city lights at %s; this downloads 51 GB once", path)
     return run_step(
         "city lights", "georing.lights.cog:build_city_lights",
-        {**runtime_env(cfg.static, 1, path), **credentials}, cfg.all_cores,
+        {**runtime_env(cfg.static, 1), **credentials}, cfg.all_cores,
         timeout_s=LIGHTS_TIMEOUT.total_seconds(), dest=str(path),
     )
 
@@ -229,7 +229,7 @@ def late_disks(before: datetime) -> dict[str, list[str]]:
         return {}
     return _step(
         cfg, "late disks", "georing.download:disks_available",
-        {**runtime_env(cfg.static, 1, _lights(cfg)), **secrets}, wanted=lacking,
+        {**runtime_env(cfg.static, 1), **secrets}, wanted=lacking,
     )
 
 

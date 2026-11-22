@@ -31,15 +31,16 @@ SECRETS = (
 )
 
 
-def runtime_env(static: Path, cores: int, lights: Path) -> dict[str, str]:
+def runtime_env(static: Path, cores: int, lights: Path | None = None) -> dict[str, str]:
     """Return the environment satpy, dask and GDAL run under in a step.
 
     ``lights`` is the city-lights COG (``georing.lights``), which the Recipe
-    names by this environment.
+    names by this environment: satpy cannot read the Recipe without it, even
+    where the lights themselves are not read.
     """
     return {
         **static_env(static),
-        "GEORING_CITY_LIGHTS": str(lights),
+        **({"GEORING_CITY_LIGHTS": str(lights)} if lights else {}),
         "SATPY_CONFIG_PATH": str(Path(__file__).parent / "satpy"),  # the Recipe
         "OMP_NUM_THREADS": "1",
         "DASK_NUM_WORKERS": str(cores),
