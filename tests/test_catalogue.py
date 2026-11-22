@@ -11,7 +11,7 @@ ALL = ["goes-east", "goes-west", "himawari", "meteosat-0"]
 def publish(catalogue: Catalogue, tmp_path, slot: datetime, disks: list[str] = ALL) -> None:
     image = tmp_path / "mosaic.tif"
     image.write_bytes(b"tiff")
-    catalogue.publish(image, mosaic_item(slot, disks, [p for p in ALL if p not in disks]))
+    catalogue.publish(slot, image, disks, [p for p in ALL if p not in disks])
     catalogue.index()
 
 

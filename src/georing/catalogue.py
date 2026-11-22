@@ -18,11 +18,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from georing.satellites import by_position
-from georing.storage import Bucket, Directory
+from georing.storage import JSON, Bucket, Directory
 
 STAC_VERSION = "1.1.0"
 COG = "image/tiff; application=geotiff; profile=cloud-optimized"
-JSON = "application/json"
 # Web Mercator ends at 85.05 degrees.
 WORLD = [-180.0, -85.0511, 180.0, 85.0511]
 
@@ -107,11 +106,10 @@ class Catalogue:
             if key.rsplit("/", 1)[-1].startswith("georing_") and key.endswith(".json")
         ]
 
-    def publish(self, local: Path, item: dict) -> None:
-        """Put the Mosaic at ``local`` in its place and write ``item`` beside it."""
-        slot = datetime.strptime(item["properties"]["datetime"], "%Y-%m-%dT%H:%M:%SZ")
-        self.store.put_file(local, f"{day_path(slot)}/{item['id']}.tif", COG)
-        self.store.write_json(f"{day_path(slot)}/{item['id']}.json", item)
+    def publish(self, slot: datetime, local: Path, disks: list[str], missing: list[str]) -> None:
+        """Put the Mosaic of ``slot`` at ``local`` in its place and write its Item beside it (`mosaic_item`)."""
+        self.store.put_file(local, f"{day_path(slot)}/{mosaic_id(slot)}.tif", COG)
+        self.store.write_json(f"{day_path(slot)}/{mosaic_id(slot)}.json", mosaic_item(slot, disks, missing))
 
     def index(self) -> dict:
         """Rewrite the Collection, the root and ``latest.json``.

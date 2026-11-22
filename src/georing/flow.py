@@ -20,7 +20,7 @@ from prefect import flow, get_run_logger, runtime, task
 from prefect.deployments import run_deployment
 from prefect.futures import as_completed
 
-from georing.catalogue import Catalogue, mosaic_id, mosaic_item, stamp, to_slot
+from georing.catalogue import Catalogue, mosaic_id, stamp, to_slot
 from georing.download import DiskMissing
 from georing.lights.cog import LOGIN, NoLogin, lights_path
 from georing.satellites import InDataStore, by_position
@@ -187,7 +187,7 @@ def publish(slot: datetime, disks: list[str], scratch: str) -> None:
     """Put the Mosaic in the store, and its Item beside it."""
     cfg = settings()
     missing = [p for p in cfg.satellite_set if p not in disks]
-    Catalogue(cfg.store).publish(Path(f"{scratch}/{mosaic_id(slot)}.tif"), mosaic_item(slot, disks, missing))
+    Catalogue(cfg.store).publish(slot, Path(f"{scratch}/{mosaic_id(slot)}.tif"), disks, missing)
 
 
 @task(task_run_name="index")

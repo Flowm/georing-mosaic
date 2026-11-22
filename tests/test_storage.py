@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from georing.catalogue import Catalogue, mosaic_item
+from georing.catalogue import Catalogue
 from georing.storage import Bucket, Directory, open_store
 
 SLOT = datetime(2026, 11, 10, 18, tzinfo=UTC)
@@ -73,7 +73,7 @@ def test_a_catalogue_reads_back_what_it_published(store, tmp_path):
     product = tmp_path / "product.tif"
     product.write_bytes(b"tiff")
     catalogue = Catalogue(store)
-    catalogue.publish(product, mosaic_item(SLOT, ["goes-east", "himawari"], ["goes-west", "meteosat-0"]))
+    catalogue.publish(SLOT, product, ["goes-east", "himawari"], ["goes-west", "meteosat-0"])
 
     result = catalogue.index()
 
