@@ -333,12 +333,39 @@ def select(names: list[str], set_name: str | None) -> list[ComparisonScene]:
     return [s for s in COMPARISON_SCENES if set_name in (None, "all", s.set)]
 
 
-def main(argv: list[str] | None = None) -> int:
+def tool_options(parser: argparse.ArgumentParser) -> None:
+    """Add the options of the tools that render Disks here: this one and ``georing-fit-colour``."""
+    parser.add_argument("--work", type=Path, default=Path("work"))
+    parser.add_argument("--cores", type=int, default=8)
+    parser.add_argument("--env-file", type=Path, default=Path(".env"))
+
+
+def tool_environment(work: Path, cores: int, env_file: Path, lights: bool = False) -> None:
+    """Set this process up to render as a step does (``georing.step``), on ``cores`` CPUs.
+
+    The static files are fetched if missing, under the ``static_dir``
+    setting or else ``<work>/static``, and ``env_file``'s secrets go into the
+    environment. The city lights are named in it, as satpy cannot read the
+    Recipe without; with ``lights`` they are built first if they are
+    missing, for a render that reads them.
+    """
     from georing.lights.cog import build_city_lights, lights_path
-    from georing.render import RECIPE
     from georing.settings import load_dotenv, settings
     from georing.static import fetch_static
     from georing.step import runtime_env
+
+    os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[:cores])
+    static = settings().static if settings().static_dir else work / "static"
+    fetch_static(str(static))
+    secrets = load_dotenv(env_file)
+    path = lights_path(work)
+    if lights:
+        build_city_lights(str(path), secrets)
+    os.environ.update(runtime_env(static, cores, path), **secrets)
+
+
+def main(argv: list[str] | None = None) -> int:
+    from georing.render import RECIPE
 
     names = [s.name for s in COMPARISON_SCENES]
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -346,27 +373,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--set", choices=[*SETS, "all"], default="all",
                         help="run only this set of scenes (ignored when scenes are named)")
     parser.add_argument("--recipe", default=RECIPE, help="satpy composite to render")
-    parser.add_argument("--work", type=Path, default=Path("work"))
     parser.add_argument("--out", type=Path, help="where the images and figures go; "
                         "default: <work>/comparison/<recipe>")
-    parser.add_argument("--cores", type=int, default=8)
-    parser.add_argument("--env-file", type=Path, default=Path(".env"))
+    tool_options(parser)
     args = parser.parse_args(argv)
     if unknown := set(args.scenes) - set(names):
         parser.error(f"no Comparison scene named {', '.join(sorted(unknown))}")
 
     work = args.work.resolve()
     out = args.out or work / "comparison" / args.recipe
-    os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[: args.cores])
+    tool_environment(work, args.cores, args.env_file, lights=True)
     # A scratch directory of this run's own, so that runs side by side do
     # not clear each other's files.
     tmp = work / "comparison" / "tmp" / str(os.getpid())
     tmp.mkdir(parents=True, exist_ok=True)
-    static = settings().static if settings().static_dir else work / "static"
-    fetch_static(str(static))
-    secrets = load_dotenv(args.env_file)
-    lights = Path(build_city_lights(str(lights_path(work)), secrets))
-    os.environ.update(runtime_env(static, args.cores, lights), TMPDIR=str(tmp), **secrets)
+    os.environ["TMPDIR"] = str(tmp)
     out.mkdir(parents=True, exist_ok=True)
 
     for scene in select(args.scenes, args.set):

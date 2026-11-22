@@ -96,23 +96,11 @@ def _on_grid(position: str, slot: datetime, work: Path, bounds, queries, **load)
     Where it was is as the join takes it (``georing.mosaic.satellite_positions``).
     The first query must be one of the Disk's bands, on its own grid.
     """
-    import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
-    from satpy import Scene
-
     from georing.compare import comparison_disk
     from georing.mosaic import positions_from
-    from georing.render import (
-        _serialise_netcdf_reads,
-        quiet_known_warnings,
-        satellite_position_tags,
-    )
-    from georing.satellites import by_position
+    from georing.render import open_disk, satellite_position_tags
 
-    _serialise_netcdf_reads()
-    quiet_known_warnings()
-    disk_dir = comparison_disk(position, slot, work)
-    files = sorted(str(p) for p in disk_dir.iterdir() if not p.name.startswith("."))
-    scn = Scene(filenames=files, reader=by_position(position).reader)
+    scn = open_disk(position, str(comparison_disk(position, slot, work)))
     scn.load(queries, **load)
     positions = positions_from(scn[queries[0]].attrs["area"].crs.to_dict(), satellite_position_tags(scn))
     # The whole Scene must outlive the reads: dropping it closes the FCI files.
@@ -259,25 +247,18 @@ def _slot(text: str) -> datetime:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from georing.lights.cog import lights_path
-    from georing.settings import load_dotenv, settings
-    from georing.static import fetch_static
-    from georing.step import runtime_env
+    from georing.compare import tool_environment, tool_options
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     for neighbour in NEIGHBOURS:
         parser.add_argument(f"--{neighbour}", nargs="*", type=_slot, default=[],
                             help=f"Slots to learn from {neighbour} on, such as 2026-11-10T09")
     parser.add_argument("--check", nargs="*", type=_slot, default=[], help="Slots only measured, on every neighbour")
-    parser.add_argument("--work", type=Path, default=Path("work"))
-    parser.add_argument("--cores", type=int, default=8)
-    parser.add_argument("--env-file", type=Path, default=Path(".env"))
+    tool_options(parser)
     args = parser.parse_args(argv)
-
     work = args.work.resolve()
-    static = settings().static if settings().static_dir else work / "static"
-    fetch_static(str(static))
-    os.environ.update(runtime_env(static, args.cores, lights_path(work)), **load_dotenv(args.env_file))
+    # Only bands are read here, and the Recipe's green: not the city lights.
+    tool_environment(work, args.cores, args.env_file)
 
     learnt = {n: getattr(args, n.replace("-", "_")) for n in NEIGHBOURS}
     data = {}

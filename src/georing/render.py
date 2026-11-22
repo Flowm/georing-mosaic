@@ -69,6 +69,21 @@ def satellite_position_tags(scn) -> dict[str, str]:
     return {}
 
 
+def open_disk(position: str, disk_dir: str):
+    """Return the Disk of ``position`` in ``disk_dir`` as a satpy Scene, nothing loaded yet."""
+    import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
+    from satpy import Scene
+
+    from georing.satellites import by_position
+
+    files = sorted(
+        str(p) for p in Path(disk_dir).iterdir() if not p.name.startswith(".") and p.suffix != ".part"
+    )
+    _serialise_netcdf_reads()
+    quiet_known_warnings()
+    return Scene(filenames=files, reader=by_position(position).reader)
+
+
 def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIPE):
     """Open the Disk in ``disk_dir`` and make ``recipe`` up to the last resample.
 
@@ -76,20 +91,9 @@ def load_recipe(position: str, disk_dir: str, grid_dir: str, recipe: str = RECIP
     resolution and whose night layer is finished. Resampling it to its finest
     grid with the ``native`` resampler makes the Recipe itself.
     """
-    import hdf5plugin  # noqa: F401  (FCI files are compressed with its filters)
-    from satpy import Scene
-
     from georing.lights import layer as lights
-    from georing.satellites import by_position
 
-    sat = by_position(position)
-    files = sorted(
-        str(p) for p in Path(disk_dir).iterdir() if not p.name.startswith(".") and p.suffix != ".part"
-    )
-    _serialise_netcdf_reads()
-    quiet_known_warnings()
-
-    scn = Scene(filenames=files, reader=sat.reader)
+    scn = open_disk(position, disk_dir)
     scn.load([recipe])
     # satpy has now made what it can without resampling. The night layer is
     # stuck on its two static images, which sit on their own lat/lon grids
