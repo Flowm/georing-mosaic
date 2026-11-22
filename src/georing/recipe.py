@@ -288,7 +288,8 @@ class TwilightCompositor(DayNightCompositor):
         return data
 
 
-def _interp(values: np.ndarray, xp: np.ndarray, fp: np.ndarray) -> np.ndarray:
+def curve(values: np.ndarray, xp: np.ndarray, fp: np.ndarray) -> np.ndarray:
+    """Map ``values`` through the curve through points ``xp``, ``fp``, keeping their dtype; for ``map_blocks``."""
     return np.interp(values, xp, fp).astype(values.dtype)
 
 
@@ -297,7 +298,7 @@ def _recolour(img, source, xp, curves):
     data = img.data
     xp = np.asarray(xp, dtype=float) / 255
     bands = [
-        da.map_blocks(_interp, source(band), xp, np.asarray(fp, dtype=float) / 255, dtype=data.dtype)
+        da.map_blocks(curve, source(band), xp, np.asarray(fp, dtype=float) / 255, dtype=data.dtype)
         for band, fp in zip("RGB", curves, strict=True)
     ]
     if "A" in data["bands"].values:

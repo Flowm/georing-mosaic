@@ -168,15 +168,14 @@ def colour_by_radiance(img, xp, red, green, blue, sea=(0, 0, 0), **kwargs):
     import dask.array as da
     import xarray as xr
 
-    def interp(values, xp, fp):
-        return np.interp(values, xp, fp).astype(values.dtype)
+    from georing.recipe import curve
 
     data = img.data
     level = da.log1p(da.maximum(data.sel(bands="L").data, 0))
     water = 1 - data.sel(bands="A").data
     xp = np.log1p(np.asarray(xp, dtype=float))
     bands = [
-        da.map_blocks(interp, level, xp, np.asarray(fp, dtype=float) / 255, dtype=level.dtype)
+        da.map_blocks(curve, level, xp, np.asarray(fp, dtype=float) / 255, dtype=level.dtype)
         - water * ((fp[0] - dark) / 255)
         for fp, dark in zip((red, green, blue), sea, strict=True)
     ]
